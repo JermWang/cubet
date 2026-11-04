@@ -274,7 +274,7 @@ function openModal(title, content, cls = '') {
   returnFocus = document.activeElement;
   $('#modalRoot').innerHTML = `<div class="scrim"><section class="modal ${cls}" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><button class="modal-close" type="button" data-action="close" aria-label="Close dialog">×</button><h3 id="modalTitle">${esc(title)}</h3>${content}</section></div>`;
   document.body.style.overflow = 'hidden';
-  $('#modalRoot button').focus();
+  ($('#modalRoot input:not([type=hidden])') || $('#modalRoot button')).focus();
 }
 function closeModal() {
   $('#modalRoot').replaceChildren();
@@ -359,7 +359,7 @@ async function chartModal(b) {
 /* ---------- wallet + money modals ---------- */
 function walletModal() {
   openModal('Your demo wallet', `<p>You play as <b>${esc(state.me?.handle || '…')}</b>. Demo balance: <b>${coins(state.balance)}</b>.</p>
-    <p class="note">Your balance and bets are kept in cubet's bet book on the server, linked to this browser by a cookie. Stakes are demo ${CUR}: nothing is sent on-chain and no wallet connects. Every other player is a real visitor.</p>
+    <p class="note">Every new player starts with ${cfg.startingBalance} demo ${CUR}. Your balance and bets are kept in cubet's bet book on the server, linked to this browser by a cookie. Stakes are demo ${CUR}: nothing is sent on-chain and no wallet connects. Every other player is a real visitor.</p>
     <div class="mact"><button class="btn" type="button" data-action="deposit">Deposit</button><button class="btn ghost" type="button" data-action="withdraw">Withdraw</button></div>
     <label class="demo-label" for="theme">Appearance</label>
     <div class="selwrap"><select id="theme" class="sel full">${['dark', 'light', 'auto'].map(t => `<option value="${t}" ${state.theme === t ? 'selected' : ''}>${t === 'auto' ? 'System' : t === 'dark' ? 'Dark' : 'Light'}</option>`).join('')}</select>${chevron}</div>`);

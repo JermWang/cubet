@@ -31,7 +31,7 @@ export class BookError extends Error {
 }
 const fail = (status, code, message) => { throw new BookError(status, code, message); };
 
-export function createBook({ dbPath, market, maxDeposit = 1000, minStake = 0.01, maxStake = 100, maxOpenPerPlayer = 20, log = console }) {
+export function createBook({ dbPath, market, startingBalance = 1, maxDeposit = 1000, minStake = 0.01, maxStake = 100, maxOpenPerPlayer = 20, log = console }) {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec(`
@@ -105,11 +105,14 @@ export function createBook({ dbPath, market, maxDeposit = 1000, minStake = 0.01,
     if (!session || session.length < 20 || session.length > 100) return null;
     return q.playerBySession.get(hash(session)) || null;
   }
-  /** Create a new anonymous player and return [session, player]. */
+  /** Create a new anonymous player, credit the starting demo balance, and return [session, player]. */
   function newPlayer() {
     const session = randomBytes(32).toString('base64url');
     const id = randomUUID();
-    q.insertPlayer.run(id, hash(session), handleFor(), Date.now());
+    tx(() => {
+      q.insertPlayer.run(id, hash(session), handleFor(), Date.now());
+      if (startingBalance > 0) move(id, toU(startingBalance), 'starting demo balance');
+    });
     return [session, q.playerById.get(id)];
   }
   const me = p => ({ id: p.id, handle: p.handle, balance: fromU(p.balance_u) });

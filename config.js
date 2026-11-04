@@ -13,6 +13,7 @@ window.CUBET = {
 
   currency: 'SOL',
   storageKey: 'cubet-v2',       // browser key for the theme preference only
+  startingBalance: 1,           // demo SOL every new player starts with (credited by the server)
   maxDeposit: 1000,             // demo SOL a player can add per day (enforced on the server)
   minStake: 0.01,               // stake limits (enforced on the server)
   maxStake: 100,

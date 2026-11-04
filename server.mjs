@@ -48,6 +48,7 @@ const market = createMarket({
 const book = createBook({
   dbPath: str('DB_PATH', path.join(root, 'data', 'cubet.db')),
   market,
+  startingBalance: num('STARTING_BALANCE', 1),
   maxDeposit: num('MAX_DEPOSIT', 1000),
 });
 const SESSION = 'cubet_sid';

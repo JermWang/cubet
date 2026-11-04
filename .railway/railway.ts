@@ -40,6 +40,7 @@ export default defineRailway(() => {
       // Demo economy
       CURRENCY: "SOL",
       STORAGE_KEY: "cubet-v2",
+      STARTING_BALANCE: "1",   // demo SOL each new player starts with
       MAX_DEPOSIT: "1000",
       DEFAULT_STAKE: "0.1",
 
