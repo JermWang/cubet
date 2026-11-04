@@ -154,8 +154,14 @@ function renderList() {
   const bets = state.bets.filter(b => inTab(b, ui.tab) && (!filter || b.token.ca === filter))
     .sort((a, b) => ui.tab === 'settled' ? b.expiresAt - a.expiresAt : a.expiresAt - b.expiresAt);
   const list = $('#list');
+  // The list sits above the bet wizard. When it grows or shrinks (another player's bet arrives), keep
+  // whatever the visitor is looking at in place. Chrome and Firefox do this natively (scroll anchoring);
+  // Safari doesn't, so pin the wizard by hand there.
+  const pin = !CSS.supports('overflow-anchor', 'auto') && $('#createForm');
+  const pinTop = pin && pin.getBoundingClientRect().top < innerHeight ? pin.getBoundingClientRect().top : null;
   if (ui.loading && !bets.length && ui.tab === 'open') list.innerHTML = skeleton(4);
   else list.innerHTML = bets.length ? bets.map(row).join('') : emptyState(Boolean(filter));
+  if (pinTop !== null) window.scrollBy(0, pin.getBoundingClientRect().top - pinTop);
   $$('[data-tab]').forEach(btn => {
     const on = btn.dataset.tab === ui.tab;
     btn.setAttribute('aria-selected', String(on));
