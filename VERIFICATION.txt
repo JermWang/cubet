@@ -1,0 +1,27 @@
+Verified November 4, 2026
+
+Live data
+PASS /api/token verifies mints on-chain via Solana getAccountInfo (jsonParsed): program, decimals, supply, authorities
+PASS non-mint addresses rejected ("not a token mint"); malformed input rejected
+PASS /api/tokens, /api/trending, /api/chart: live DexScreener and GeckoTerminal data
+PASS /api/cap-at: market cap at an exact past minute from a GeckoTerminal candle, returning the pool and candle time
+
+Shared bet book (book.mjs, real players only)
+PASS two separate sessions: deposit, create, take; a player cannot take their own bet; a bet cannot be taken twice
+PASS server re-checks the token and rejects targets on the wrong side of the live cap
+PASS cross-site POST rejected (Origin check); POST without a session rejected; DB file not served
+PASS settlement: expired taken bet settled on the 1-minute candle containing the expiry (pool 7RD5…KeCv),
+     winner paid the full pot; expired untaken bet refunded; ledger balances to the unit
+PASS terminal UI: deposit, create from a market deep link, a second real player takes it, the creator is told within 5 s
+PASS leaderboard and landing ranks come from settled bets of real players; no sample players or invented handles anywhere
+
+Proof page (/proof)
+PASS live checks run the real token, settlement-price and bet-book endpoints and show raw responses
+PASS settlement ledger links each result's pool and candle; states the limits (demo SOL, server-run settlement, no token)
+
+Site
+PASS layout check at 1440, 768 and 375 px: no overlapping text, no clipped tabs, no horizontal scroll, no console errors
+PASS www.cubetsolana.xyz and cubetsolana.xyz serve over valid HTTPS (Railway); og:image and twitter:site resolve
+
+Scope: market data, token checks, matching and settlement are real; stakes are demo SOL in cubet's database.
+No wallet connection or on-chain escrow is implemented, so there are no bet transactions on-chain.

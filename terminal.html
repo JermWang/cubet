@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="The cubet betting terminal: market-cap bets on any Solana token, with live on-chain and market data. Stakes are demo SOL for now.">
+<title>Terminal · cubet</title>
+<!--server-meta-->
+<link rel="icon" href="/favicon.svg">
+<link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/fonts.css">
+<link rel="stylesheet" href="/styles.css">
+<script src="/config.js" defer></script>
+<script src="/runtime-config.js" defer></script>
+<script src="/data.js" defer></script>
+<script src="/fx.js" defer></script>
+<script src="/art.js" defer></script>
+<script src="/app.js" defer></script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap nav">
+    <a class="logo" href="/" aria-label="cubet home"><span class="logo-cube" data-cube='{"inner":false,"dots":false,"faces":true,"stroke":1.9,"speed":1.1,"tumble":true}' aria-hidden="true"></span><span data-brand>cubet</span></a>
+    <nav class="links" aria-label="Terminal">
+      <button type="button" data-action="go" data-go="bet" aria-current="page">Bets</button>
+      <button type="button" data-action="go" data-go="mine">My Bets</button>
+      <button type="button" data-action="go" data-go="leader">Leaderboard</button>
+    </nav>
+    <div class="navr">
+      <button class="balpill" id="balpill" type="button" data-action="wallet" aria-label="Your demo wallet"><span class="live-dot" aria-hidden="true"></span><b>0 SOL</b></button>
+      <button class="btn sm" type="button" data-action="deposit">Deposit</button>
+      <button class="btn sm ghost hide-xs" type="button" data-action="withdraw">Withdraw</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" style="position:relative">
+  <div class="term-glow" aria-hidden="true"></div>
+  <section class="term-head" aria-labelledby="termTitle">
+    <div>
+      <p class="kicker"><span class="live-dot" aria-hidden="true"></span>Live Solana market data · demo SOL</p>
+      <h1 id="termTitle">Terminal</h1>
+      <p>Take an open bet, or make your own call. Every bet settles on the real market cap.</p>
+    </div>
+    <div class="term-actions">
+      <button class="btn lg ghost" type="button" data-action="wallet">Wallet</button>
+      <button class="btn lg glow" type="button" data-action="start-create">New bet <span class="arr" aria-hidden="true">→</span></button>
+    </div>
+  </section>
+
+  <dl class="statusbar" id="termStats" aria-label="Terminal stats"></dl>
+
+  <section id="betView" aria-label="Bets">
+    <p class="datanote" id="dataNote" role="status" hidden><span class="spinner" aria-hidden="true"></span>Live market data is reconnecting. Prices may be a little stale.</p>
+    <div class="bar">
+      <div class="tabs" role="tablist" aria-label="Bet status" id="tabs">
+        <button class="tab" type="button" role="tab" data-action="tab" data-tab="open" aria-selected="true">Open<span class="count" data-count="open">0</span></button>
+        <button class="tab" type="button" role="tab" data-action="tab" data-tab="mine" aria-selected="false" tabindex="-1">My Bets<span class="count" data-count="mine">0</span></button>
+        <button class="tab" type="button" role="tab" data-action="tab" data-tab="settled" aria-selected="false" tabindex="-1">Settled<span class="count" data-count="settled">0</span></button>
+      </div>
+      <div class="selwrap">
+        <select class="sel" id="coinFilter" aria-label="Filter by coin"><option value="">All coins</option></select>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+    </div>
+
+    <div class="list" id="list" aria-live="polite"></div>
+
+    <section class="wiz" id="createForm" aria-labelledby="wTitle">
+      <button type="button" class="wiz-back" id="wizBack" data-action="wiz-back" hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Back
+      </button>
+      <div class="wiz-top"><span class="balpill static" id="balpill2">Wallet <b>0 SOL</b></span></div>
+      <ol class="stepper" id="stepper" aria-label="Create a bet">
+        <li class="cur" aria-current="step"><button type="button" data-action="wstep" data-step="1" disabled><span class="n">01</span><span>Coin</span></button></li>
+        <li><button type="button" data-action="wstep" data-step="2" disabled><span class="n">02</span><span>Call</span></button></li>
+        <li><button type="button" data-action="wstep" data-step="3" disabled><span class="n">03</span><span>Confirm</span></button></li>
+      </ol>
+      <div id="wizBody" data-step="1"></div>
+      <p class="wiz-foot">Bet with anyone. On anything on Solana.</p>
+    </section>
+  </section>
+
+  <section id="leaderView" aria-labelledby="lbh" hidden>
+    <h2 id="lbh" class="pagetitle">Leaderboard</h2>
+    <p class="pagenote">Every player here is a real visitor, ranked by profit and loss on settled bets. Stakes are demo SOL.</p>
+    <div class="podium" id="podium"></div>
+    <div class="lb" id="lb"></div>
+  </section>
+</main>
+
+<footer class="site">
+  <span data-footer></span>
+  <span>Data: Solana RPC · DexScreener · GeckoTerminal. Not financial advice. · <a href="/proof">Proof</a> · <a href="https://github.com/JermWang/cubet" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="https://x.com/cubetsol" target="_blank" rel="noopener noreferrer">X @cubetsol</a></span>
+</footer>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+<div id="fxRoot" class="fx" aria-hidden="true"></div>
+</body>
+</html>

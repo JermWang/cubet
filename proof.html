@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Check cubet yourself: run the live on-chain and market-data checks, see every bet settlement with the price candle it used, and read the code.">
+<title>Proof · cubet</title>
+<!--server-meta-->
+<link rel="icon" href="/favicon.svg">
+<link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/fonts.css">
+<link rel="stylesheet" href="/styles.css">
+<script src="/config.js" defer></script>
+<script src="/runtime-config.js" defer></script>
+<script src="/data.js" defer></script>
+<script src="/fx.js" defer></script>
+<script src="/art.js" defer></script>
+<script src="/proof.js" defer></script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap nav">
+    <a class="logo" href="/" aria-label="cubet home"><span class="logo-cube" data-cube='{"inner":false,"dots":false,"faces":true,"stroke":1.9,"speed":1.1,"tumble":true}' aria-hidden="true"></span><span data-brand>cubet</span></a>
+    <nav class="links" aria-label="Main">
+      <a href="/">Home</a>
+      <a href="/terminal">Terminal</a>
+      <a href="/proof" aria-current="page">Proof</a>
+    </nav>
+    <div class="navr">
+      <a class="xlink" href="https://x.com/cubetsol" target="_blank" rel="noopener noreferrer" aria-label="cubet on X"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+      <a class="btn sm" href="/terminal">Launch terminal</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap proof">
+  <section class="term-head" aria-labelledby="proofTitle">
+    <div>
+      <p class="kicker"><span class="live-dot" aria-hidden="true"></span>Check it yourself</p>
+      <h1 id="proofTitle">Proof</h1>
+      <p>Everything cubet says it does, the live check behind it, and what it doesn't do yet.</p>
+    </div>
+  </section>
+
+  <section class="pf-sec" aria-labelledby="pfScope">
+    <h2 id="pfScope">What's real, and what isn't yet</h2>
+    <div class="pf-grid2">
+      <div class="pf-card">
+        <h3 class="pf-yes">Real</h3>
+        <ul>
+          <li><b>Every token is checked on-chain.</b> Our server calls Solana <code>getAccountInfo</code> on the address and only accepts SPL Token or Token-2022 mints.</li>
+          <li><b>Live market data.</b> Names, logos, market caps and 24h change come from DexScreener. Charts and settlement prices come from GeckoTerminal price candles.</li>
+          <li><b>Every player is a real visitor.</b> Bets are matched in one shared bet book on our server. No bots or sample players.</li>
+          <li><b>Settlement on the real market cap.</b> When a bet ends, the server reads the market cap at that exact minute, pays the winner, and records the pool and candle it used, listed below.</li>
+        </ul>
+      </div>
+      <div class="pf-card">
+        <h3 class="pf-no">Not yet</h3>
+        <ul>
+          <li><b>Stakes are demo SOL.</b> Balances are numbers in cubet's database. No wallet connects and nothing is sent on-chain, so there are no bet transactions to show.</li>
+          <li><b>Settlement is run by cubet's server,</b> not by an on-chain program. You can recompute every result from the public candle it links, but you are trusting our server to run it.</li>
+          <li><b>No cubet token.</b> cubet has not launched a token. Any token claiming to be cubet's is not ours unless its address appears on this page and on <a href="https://x.com/cubetsol" target="_blank" rel="noopener noreferrer">@cubetsol</a>.</li>
+          <li><b>Market cap is DexScreener's figure</b> for the token's top pair (FDV when no market cap is published). A past market cap is that pair's candle close price times the same supply ratio.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="pf-sec" aria-labelledby="pfLive">
+    <h2 id="pfLive">Live checks</h2>
+    <p class="pf-lede">Each button runs the real integration on our server right now and shows the raw response.</p>
+    <div class="pf-checks">
+      <article class="pf-check" data-check="token">
+        <header><span class="pf-n">01</span><div><h3>On-chain token check</h3><p>Solana JSON-RPC <code>getAccountInfo(<span data-mint-short></span>, jsonParsed)</code>, plus DexScreener market data.</p></div></header>
+        <div class="pf-row"><button class="btn sm" type="button" data-run="token">Run check</button><a class="pf-link" data-solscan target="_blank" rel="noopener noreferrer">Verify on Solscan ↗</a></div>
+        <pre class="pf-out" data-out="token" aria-live="polite">Not run yet.</pre>
+      </article>
+      <article class="pf-check" data-check="cap">
+        <header><span class="pf-n">02</span><div><h3>Settlement price, one hour ago</h3><p>The same call that settles bets: the market cap at an exact past minute, from a GeckoTerminal candle.</p></div></header>
+        <div class="pf-row"><button class="btn sm" type="button" data-run="cap">Run check</button><a class="pf-link" data-pool target="_blank" rel="noopener noreferrer" hidden>Open the pool on GeckoTerminal ↗</a></div>
+        <pre class="pf-out" data-out="cap" aria-live="polite">Not run yet.</pre>
+      </article>
+      <article class="pf-check" data-check="book">
+        <header><span class="pf-n">03</span><div><h3>The bet book right now</h3><p>Open bets, bets in play, settled bets and distinct players, counted from the shared bet book.</p></div></header>
+        <div class="pf-row"><button class="btn sm" type="button" data-run="book">Run check</button></div>
+        <pre class="pf-out" data-out="book" aria-live="polite">Not run yet.</pre>
+      </article>
+    </div>
+  </section>
+
+  <section class="pf-sec" aria-labelledby="pfSettle">
+    <h2 id="pfSettle">Every settlement</h2>
+    <p class="pf-lede">The most recent settled bets, newest first. Each shows the market cap at expiry, where it came from, and who won. Open the pool, find the candle at the time shown, and you get the same number.</p>
+    <div class="pf-table" id="settlements" aria-live="polite"><p class="pf-empty">Loading settlements…</p></div>
+  </section>
+
+  <section class="pf-sec" aria-labelledby="pfTx">
+    <h2 id="pfTx">On-chain transactions</h2>
+    <div class="pf-card">
+      <p>None yet, on purpose: stakes are demo SOL, so no bet moves funds on-chain. When real-SOL escrow ships, every escrow, payout and refund transaction will be listed here with its signature, linked to Solscan.</p>
+    </div>
+  </section>
+
+  <section class="pf-sec" aria-labelledby="pfCode">
+    <h2 id="pfCode">Read the code</h2>
+    <div class="pf-card">
+      <p>The full source is public, and the JavaScript this site runs is served un-minified, exactly as it is in the repo.</p>
+      <p class="pf-repo"><a class="btn sm" id="repoLink" href="https://github.com/JermWang/cubet" target="_blank" rel="noopener noreferrer">github.com/JermWang/cubet ↗</a></p>
+      <ul class="pf-files">
+        <li><code>book.mjs</code>: the shared bet book, balances, the ledger and settlement</li>
+        <li><code>market.mjs</code>: the Solana RPC, DexScreener and GeckoTerminal calls</li>
+        <li><code>server.mjs</code>: the API and pages, with no dependencies</li>
+        <li><code>app.js</code>, <code>landing.js</code>, <code>proof.js</code>: what runs in your browser</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <span data-footer></span>
+  <span>Data: Solana RPC · DexScreener · GeckoTerminal. Not financial advice. · <a href="https://github.com/JermWang/cubet" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="https://x.com/cubetsol" target="_blank" rel="noopener noreferrer">X @cubetsol</a></span>
+</footer>
+</body>
+</html>

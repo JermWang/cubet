@@ -1,0 +1,9 @@
+{
+  "name": "cubet-infra",
+  "private": true,
+  "type": "module",
+  "description": "Railway infrastructure-as-code tooling for cubet (not part of the app build)",
+  "devDependencies": {
+    "railway": "^3.15.0"
+  }
+}

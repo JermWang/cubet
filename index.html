@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="cubet is a market-cap betting terminal for any Solana token, built on live on-chain and market data. Stakes are demo SOL for now.">
+<title>cubet — stack your call</title>
+<!--server-meta-->
+<link rel="icon" href="/favicon.svg">
+<link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/fonts.css">
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/landing.css">
+<script src="/config.js" defer></script>
+<script src="/runtime-config.js" defer></script>
+<script src="/data.js" defer></script>
+<script src="/fx.js" defer></script>
+<script src="/art.js" defer></script>
+<script src="/landing.js" defer></script>
+</head>
+<body class="lp">
+
+<header class="top">
+  <div class="wrap nav">
+    <a class="logo" href="/" aria-label="cubet home"><span class="logo-cube" data-cube='{"inner":false,"dots":false,"faces":true,"stroke":1.9,"speed":1.1,"tumble":true}' aria-hidden="true"></span><span data-brand>cubet</span></a>
+    <nav class="links" aria-label="Main">
+      <button class="mm-trigger" type="button" data-menu aria-expanded="false" aria-controls="mm-product">Product <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <button class="mm-trigger" type="button" data-menu aria-expanded="false" aria-controls="mm-trending">Trending <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <a href="/terminal#leaderboard">Leaderboard</a>
+      <a href="#faq">FAQ</a>
+      <a href="/proof">Proof</a>
+    </nav>
+    <div class="navr">
+      <a class="xlink" href="https://x.com/cubetsol" target="_blank" rel="noopener noreferrer" aria-label="cubet on X"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+      <a class="navlink hide-xs" href="/terminal#mine">My bets</a>
+      <a class="btn sm" href="/terminal">Launch terminal</a>
+    </div>
+
+    <div class="mm-panel" id="mm-product" hidden>
+      <div class="wrap mm-inner">
+        <div class="mm-col"><h4>Bet</h4><a href="#markets">Live markets</a><a href="/terminal">Open bets</a><a href="/terminal#create">New bet</a><a href="/terminal#mine">My bets</a></div>
+        <div class="mm-col"><h4>Compete</h4><a href="/terminal#leaderboard">Leaderboard</a><a href="#features">How it works</a></div>
+        <div class="mm-col"><h4>Learn</h4><a href="#platform">Platform</a><a href="/proof">Proof</a><a href="#faq">FAQ</a></div>
+        <a class="mm-feature spot" href="/terminal"><span class="mm-cube" aria-hidden="true"></span><b>The terminal</b><span>Live Solana market data. Bets settle on the real market cap.</span></a>
+      </div>
+    </div>
+    <div class="mm-panel" id="mm-trending" hidden>
+      <div class="wrap mm-inner">
+        <div class="mm-col"><h4>Trending now</h4><div id="mmTrendA"></div></div>
+        <div class="mm-col"><h4>&nbsp;</h4><div id="mmTrendB"></div></div>
+        <div class="mm-col"><h4>Featured</h4><div id="mmFeatured"></div></div>
+        <a class="mm-feature spot" href="/terminal#create"><span class="mm-cube" aria-hidden="true"></span><b>Any coin, by address</b><span>Paste a contract address. We verify it on-chain.</span></a>
+      </div>
+    </div>
+  </div>
+</header>
+<div class="mm-scrim" aria-hidden="true"></div>
+
+<main>
+  <!-- Splash: static aura glow + fine grain behind the brand cube -->
+  <section class="splash" aria-labelledby="h1">
+    <div class="splash-glow" aria-hidden="true"></div>
+    <div class="splash-grain" aria-hidden="true"></div>
+    <div class="splash-fade" aria-hidden="true"></div>
+    <div class="wrap splash-in">
+      <div class="splash-copy">
+        <h1 id="h1" data-split><span data-brand>cubet</span> is the betting terminal for every coin, from pump to payout</h1>
+        <p class="splash-lede">Pick any Solana coin, call where its market cap lands, and someone takes the other side. When time runs out, the bet settles on the real market cap and the winner takes the whole pot.</p>
+        <div class="lp-ctas">
+          <a class="btn lg" href="/terminal">Launch terminal <span class="arr" aria-hidden="true">→</span></a>
+          <a class="btn lg ghost" href="#markets">Browse markets</a>
+        </div>
+        <p class="splash-note"><span class="live-dot" aria-hidden="true"></span>Live Solana market data · real players · demo SOL stakes for now · <a href="/proof">Proof</a></p>
+      </div>
+      <div class="splash-stage" aria-hidden="true">
+        <div class="splash-cube" id="splashCube"></div>
+      </div>
+    </div>
+    <a class="splash-scroll" href="#markets" aria-label="Scroll to live markets"><span></span></a>
+  </section>
+
+  <!-- Live markets feed -->
+  <section class="wrap markets" id="markets" aria-labelledby="mkH">
+    <div class="mk-top">
+      <h2 id="mkH" class="mk-title">Live markets</h2>
+      <p class="mk-sub"><span class="live-dot" aria-hidden="true"></span><span id="mkStatus">Loading live Solana data…</span></p>
+    </div>
+    <!-- toolbar sits on the card grid: tabs over the first two columns, search over the third -->
+    <div class="mk-toolbar">
+      <div class="tabs mk-tabs" role="tablist" aria-label="Sort markets">
+        <button class="tab" type="button" role="tab" data-sort="trending" aria-selected="true">Trending</button>
+        <button class="tab" type="button" role="tab" data-sort="gainers" aria-selected="false" tabindex="-1">Top gainers</button>
+        <button class="tab" type="button" role="tab" data-sort="losers" aria-selected="false" tabindex="-1">Top losers</button>
+        <button class="tab" type="button" role="tab" data-sort="largest" aria-selected="false" tabindex="-1">Largest</button>
+      </div>
+      <form class="mk-search glowfield" id="mkSearch" role="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+        <label class="sr" for="mkCa">Any Solana token address</label>
+        <input id="mkCa" placeholder="Paste any Solana token address" autocomplete="off" spellcheck="false">
+        <button class="btn sm" type="submit">Bet on it</button>
+      </form>
+    </div>
+    <div class="mk-grid" id="mkGrid" aria-live="polite"></div>
+    <p class="mk-foot">Prices refresh every 20 seconds · tap Higher or Lower to set up the bet in the terminal · <a href="/terminal">See all open bets <span class="arr" aria-hidden="true">→</span></a></p>
+  </section>
+
+  <!-- Features -->
+  <section class="wrap lp-section" id="features" aria-labelledby="featH">
+    <div class="lp-head reveal">
+      <h2 id="featH">Make the call.<br><span class="dim">Let the market settle it.</span></h2>
+      <a class="btn ghost" href="/terminal">Open terminal</a>
+    </div>
+
+    <article class="lp-card spot reveal">
+      <div class="lp-card-media" id="featCoin" aria-hidden="true"></div>
+      <div class="lp-card-foot">
+        <div><span class="lp-num">01</span><h3>Pick any coin</h3><p>Paste a contract address or grab one that's trending. Every address is checked on-chain before you can bet on it.</p></div>
+        <a class="lp-link" href="/terminal#create">Pick a coin <span class="arr" aria-hidden="true">→</span></a>
+      </div>
+    </article>
+
+    <article class="lp-card spot reveal">
+      <div class="lp-card-media" id="featTarget" aria-hidden="true"></div>
+      <div class="lp-card-foot">
+        <div><span class="lp-num">02</span><h3>Set your target</h3><p>Higher or lower, and by when. Real market-cap history, with the winning zone shaded as you type.</p></div>
+        <a class="lp-link" href="/terminal#create">Set a target <span class="arr" aria-hidden="true">→</span></a>
+      </div>
+    </article>
+
+    <article class="lp-card spot reveal">
+      <div class="lp-card-media" id="featPot" aria-hidden="true"></div>
+      <div class="lp-card-foot">
+        <div><span class="lp-num">03</span><h3>Winner takes the stack</h3><p>Someone takes the other side and matches your stake. At expiry, the bet settles on the real market cap. No arguments.</p></div>
+        <a class="lp-link" href="/terminal">Find a taker <span class="arr" aria-hidden="true">→</span></a>
+      </div>
+    </article>
+  </section>
+
+  <!-- Bento -->
+  <section class="wrap lp-section" id="platform" aria-labelledby="platH">
+    <div class="lp-head reveal">
+      <h2 id="platH">Not just vibes.<br><span class="dim">A full terminal.</span></h2>
+      <a class="btn ghost" href="/terminal">See it live</a>
+    </div>
+    <div class="bento">
+      <a class="b-cell b-stats spot reveal" href="/terminal">
+        <span class="kicker"><span class="live-dot" aria-hidden="true"></span>Live market</span>
+        <dl class="b-numbers" id="lpStats">
+          <div><dt>Coins trending</dt><dd data-stat="count">—</dd></div>
+          <div><dt>Combined market cap</dt><dd data-stat="cap">—</dd></div>
+          <div><dt>Top mover · 24h</dt><dd data-stat="mover">—</dd></div>
+        </dl>
+        <div class="b-chart" id="lpMiniChart" aria-hidden="true"></div>
+        <span class="b-label">Open the terminal <span class="arr" aria-hidden="true">→</span></span>
+      </a>
+      <a class="b-cell b-board spot reveal" href="/terminal#leaderboard">
+        <span class="kicker">Leaderboard</span>
+        <div class="b-art b-ranks" id="lpRanks" aria-hidden="true"></div>
+        <span class="b-label">See the rankings <span class="arr" aria-hidden="true">→</span></span>
+      </a>
+      <a class="b-cell spot reveal" href="/terminal#create">
+        <span class="kicker">Time to target</span>
+        <div class="b-art b-time"><span class="b-clock" id="lpClock" aria-hidden="true"></span><div class="chips" id="lpDurations"></div></div>
+        <span class="b-label">15 minutes to 7 days <span class="arr" aria-hidden="true">→</span></span>
+      </a>
+      <a class="b-cell spot reveal" href="/terminal#create">
+        <span class="kicker">Your call</span>
+        <div class="b-art b-call" id="lpCall"></div>
+        <span class="b-label">Higher or lower <span class="arr" aria-hidden="true">→</span></span>
+      </a>
+      <a class="b-cell b-chain spot reveal" href="/terminal#create">
+        <span class="kicker">On-chain check</span>
+        <pre class="b-code" id="lpChain" aria-label="An on-chain check of a real token">getAccountInfo(<span class="c-dim">…</span>)</pre>
+        <span class="b-label">Verified on-chain <span class="arr" aria-hidden="true">→</span></span>
+      </a>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="wrap lp-section lp-faq" id="faq" aria-labelledby="faqH">
+    <div class="lp-head reveal"><h2 id="faqH">Questions</h2></div>
+    <div class="faq reveal">
+      <details>
+        <summary>Is the data real?</summary>
+        <p>Yes. Tokens are checked against the Solana blockchain, and names, logos, market caps and charts are live from DexScreener and GeckoTerminal. Bets settle on the real market cap at the moment they expire.</p>
+      </details>
+      <details>
+        <summary>Is this real money?</summary>
+        <p>Not yet. Stakes are demo SOL. Every other player is a real visitor, and bets, balances and settlements are kept in cubet's shared bet book on our server. No wallet connects and nothing is sent on-chain, so there are no transactions to show yet. The <a href="/proof">Proof page</a> lists every settlement with the market data it used.</p>
+      </details>
+      <details>
+        <summary>How does a bet work?</summary>
+        <p>Pick a coin, a target market cap, higher or lower, and a deadline. Someone takes the other side with the same stake. Whoever is right when time runs out takes the pot.</p>
+      </details>
+      <details>
+        <summary>Which coins can I bet on?</summary>
+        <p>Any Solana token with a trading pair. Paste its contract address, or pick one from the live markets.</p>
+      </details>
+      <details>
+        <summary>How is a bet settled?</summary>
+        <p>When a bet ends, our server reads the token's market cap at that exact minute from its GeckoTerminal price candle (the live DexScreener cap if it ended in the last two minutes) and pays the winner the whole pot. Each settlement on the Proof page links the pool and candle so you can check it. If no market data exists for the expiry, the bet is void and both stakes are refunded.</p>
+      </details>
+      <details>
+        <summary>Who can see my bets?</summary>
+        <p>Everyone sees open bets, bets in play and settlements, under an anonymous handle like 4xRw…LhgK. No account, email or wallet is needed. Your session is a cookie in this browser.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="wrap lp-section">
+    <div class="lp-final spot reveal">
+      <div class="lp-final-cube" id="finalCube" aria-hidden="true"></div>
+      <h2>Ready to make a call?</h2>
+      <p>Open the terminal and place your first bet in under a minute.</p>
+      <a class="btn lg glow" href="/terminal">Launch terminal <span class="arr" aria-hidden="true">→</span></a>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap lp-footer">
+  <div class="lp-footer-brand">
+    <a class="logo" href="/"><span class="logo-cube" data-cube='{"inner":false,"dots":false,"stroke":1.4,"speed":0.35,"follow":false}' aria-hidden="true"></span><span data-brand>cubet</span></a>
+    <p data-footer></p>
+  </div>
+  <nav class="lp-footer-links" aria-label="Footer">
+    <div><b>Product</b><a href="/terminal">Terminal</a><a href="/terminal#create">New bet</a><a href="/terminal#leaderboard">Leaderboard</a></div>
+    <div><b>Learn</b><a href="#features">How it works</a><a href="/proof">Proof</a><a href="#faq">FAQ</a></div>
+    <div><b>Data</b><a href="https://dexscreener.com/solana" target="_blank" rel="noopener noreferrer">DexScreener</a><a href="https://www.geckoterminal.com/solana/pools" target="_blank" rel="noopener noreferrer">GeckoTerminal</a><a href="https://solscan.io" target="_blank" rel="noopener noreferrer">Solscan</a></div>
+    <div><b>Community</b><a href="https://x.com/cubetsol" target="_blank" rel="noopener noreferrer">X @cubetsol</a><a href="https://github.com/JermWang/cubet" target="_blank" rel="noopener noreferrer">GitHub</a></div>
+  </nav>
+</footer>
+</body>
+</html>

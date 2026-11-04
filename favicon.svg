@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- cubet mark: a glowing isometric wireframe cube with a nested inner cube. -->
+  <defs>
+    <linearGradient id="g" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C6DAFF"/><stop offset=".5" stop-color="#4D7CFF"/><stop offset="1" stop-color="#7B61FF"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#03040C"/>
+  <g fill="none" stroke="url(#g)" stroke-linejoin="round" stroke-linecap="round" filter="url(#glow)">
+    <g stroke-width="2.6">
+      <path d="M32 8 53 20 53 44 32 56 11 44 11 20Z"/>
+      <path d="M11 20 32 32 53 20M32 32V56"/>
+    </g>
+    <g stroke-width="1.6" opacity=".75">
+      <path d="M32 24 39.5 28.3 39.5 36.9 32 41.2 24.5 36.9 24.5 28.3Z"/>
+      <path d="M24.5 28.3 32 32.6 39.5 28.3M32 32.6V41.2"/>
+    </g>
+  </g>
+</svg>
