@@ -84,7 +84,7 @@ const compressible = /^(text\/|application\/json|image\/svg)/;
 // Only files the site needs are served; server code, .env and docs never are.
 const PUBLIC_FILES = new Set([
   'index.html', 'terminal.html', 'styles.css', 'landing.css', 'fonts.css',
-  'config.js', 'data.js', 'fx.js', 'art.js', 'app.js', 'landing.js', 'favicon.svg', 'robots.txt', 'og.png',
+  'config.js', 'data.js', 'fx.js', 'mascot.js', 'art.js', 'app.js', 'landing.js', 'favicon.svg', 'robots.txt', 'og.png',
   'proof.html', 'proof.js',
 ]);
 const isPublic = rel => PUBLIC_FILES.has(rel) || /^fonts\/[\w.-]+\.woff2$/.test(rel);

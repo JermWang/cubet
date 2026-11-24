@@ -59,9 +59,9 @@ const terminalUrl = (t, dir, target, duration, stake = cfg.defaultStake) =>
 $$('[data-brand]').forEach(el => { el.textContent = cfg.brand.name; });
 $$('[data-footer]').forEach(el => { el.textContent = cfg.brand.footer; });
 document.title = cfg.brand.title;
-// The brand cube everywhere: one wireframe cube, tumbling, exactly like the nav logo.
+// The splash is the cubet mascot, big (mascot.js). The smaller brand cubes stay wireframes.
+Mascot.mount($('#splashCube'));
 const BRAND_CUBE = { inner: false, dots: false, faces: true, tumble: true };
-FX.cube($('#splashCube'), { ...BRAND_CUBE, stroke: 2.2, speed: 0.55, trails: true });
 FX.cube($('#finalCube'), { ...BRAND_CUBE, stroke: 2, speed: 0.5 });
 $$('.mm-cube').forEach(n => FX.cube(n, { ...BRAND_CUBE, stroke: 1.5, speed: 0.6, follow: false }));
 $('#lpClock').innerHTML = art.clock();
