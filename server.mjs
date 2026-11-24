@@ -237,7 +237,7 @@ async function payApi(req, res, route, arg, query) {
   }
   if (req.method !== 'POST') return sendJson(req, res, 405, { error: 'method', message: 'Method not allowed.' });
   const body = await readJson(req);
-  if (route === 'auth' && arg === 'nonce') return sendJson(req, res, 200, payments.challenge(String(body.wallet || '')));
+  if (route === 'auth' && arg === 'nonce') return sendJson(req, res, 200, payments.challenge(String(body.wallet || ''), req.headers.host));
   if (route === 'auth' && arg === 'verify') {
     const out = payments.verifySignIn(String(body.wallet || ''), body.nonce, String(body.signature || ''));
     book.signOut(session);

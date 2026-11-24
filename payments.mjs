@@ -94,15 +94,17 @@ export function createPayments({ book, rpcUrl, cluster = 'mainnet-beta', treasur
 
   /* ---------- sign-in with a wallet ---------- */
   const nonces = new Map();                      // nonce → { wallet, message, exp }
-  function challenge(wallet) {
+  // `host` is the page the visitor is on, so the wallet shows a message for the same domain it's connected from.
+  function challenge(wallet, host) {
     if (!isAddress(wallet)) fail(400, 'bad_wallet', 'That is not a Solana wallet address.');
+    const site = /^[a-z0-9.-]{1,100}(:\d{1,5})?$/i.test(String(host || '')) ? String(host).toLowerCase() : domain;
     const now = Date.now();
     for (const [k, v] of nonces) if (v.exp < now) nonces.delete(k);
     if (nonces.size > 20000) fail(429, 'busy', 'Too many sign-in attempts right now. Try again in a minute.');
     const nonce = randomBytes(16).toString('hex');
-    const message = `${domain} wants you to sign in with your Solana wallet:\n${wallet}\n\n` +
+    const message = `${site} wants you to sign in with your Solana account:\n${wallet}\n\n` +
       `Signing proves you own this wallet. It is not a transaction and costs nothing.\n\n` +
-      `URI: https://${domain}\nNonce: ${nonce}\nIssued At: ${new Date(now).toISOString()}`;
+      `URI: https://${site}\nVersion: 1\nNonce: ${nonce}\nIssued At: ${new Date(now).toISOString()}`;
     nonces.set(nonce, { wallet, message, exp: now + 5 * 60e3 });
     return { nonce, message };
   }
