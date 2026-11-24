@@ -44,21 +44,22 @@
   </section>
 
   <section class="pf-sec" aria-labelledby="pfScope">
-    <h2 id="pfScope">What's real, and what isn't yet</h2>
+    <h2 id="pfScope">What's real, and what to know</h2>
     <div class="pf-grid2">
       <div class="pf-card">
         <h3 class="pf-yes">Real</h3>
         <ul>
           <li><b>Every token is checked on-chain.</b> Our server calls Solana <code>getAccountInfo</code> on the address and only accepts SPL Token or Token-2022 mints.</li>
           <li><b>Live market data.</b> Names, logos, market caps and 24h change come from DexScreener. Charts and settlement prices come from GeckoTerminal price candles.</li>
-          <li><b>Every player is a real visitor.</b> Bets are matched in one shared bet book on our server. No bots or sample players.</li>
+          <li><b>Real SOL.</b> Players sign in by signing a message with their own Solana wallet. Deposits are SOL transfers to cubet's treasury, credited only once Solana finalizes them. Withdrawals are SOL transfers from the treasury to the player's own wallet. Every one is listed below with its transaction.</li>
+          <li><b>Every player is a real wallet.</b> Bets are matched in one shared bet book on our server. No bots or sample players.</li>
           <li><b>Settlement on the real market cap.</b> When a bet ends, the server reads the market cap at that exact minute, pays the winner, and records the pool and candle it used, listed below.</li>
         </ul>
       </div>
       <div class="pf-card">
-        <h3 class="pf-no">Not yet</h3>
+        <h3 class="pf-no">Trust and limits</h3>
         <ul>
-          <li><b>Stakes are demo SOL.</b> Balances are numbers in cubet's database. No wallet connects and nothing is sent on-chain, so there are no bet transactions to show.</li>
+          <li><b>cubet is custodial.</b> Deposited SOL is held in cubet's treasury wallet, controlled by cubet's server, not by an on-chain escrow program. The treasury's live balance against everything cubet owes is shown below.</li>
           <li><b>Settlement is run by cubet's server,</b> not by an on-chain program. You can recompute every result from the public candle it links, but you are trusting our server to run it.</li>
           <li id="pfToken"><b>No cubet token.</b> cubet has not launched a token. Any token claiming to be cubet's is not ours unless its address appears on this page and on <a href="https://x.com/cubetsol_" target="_blank" rel="noopener noreferrer">@cubetsol_</a>.</li>
           <li><b>Market cap is DexScreener's figure</b> for the token's top pair (FDV when no market cap is published). A past market cap is that pair's candle close price times the same supply ratio.</li>
@@ -96,10 +97,10 @@
   </section>
 
   <section class="pf-sec" aria-labelledby="pfTx">
-    <h2 id="pfTx">On-chain transactions</h2>
-    <div class="pf-card">
-      <p>None yet, on purpose: stakes are demo SOL, so no bet moves funds on-chain. When real-SOL escrow ships, every escrow, payout and refund transaction will be listed here with its signature, linked to Solscan.</p>
-    </div>
+    <h2 id="pfTx">Treasury and transactions</h2>
+    <p class="pf-lede">Read live from Solana: the treasury's balance, everything cubet owes players right now, and every deposit and withdrawal with its transaction on Solscan.</p>
+    <div class="pf-card" id="treasury" aria-live="polite"><p class="pf-empty">Loading the treasury…</p></div>
+    <div class="pf-table" id="transfers" aria-live="polite"></div>
   </section>
 
   <section class="pf-sec" aria-labelledby="pfCode">
@@ -109,6 +110,8 @@
       <p class="pf-repo"><a class="btn sm" id="repoLink" href="https://github.com/JermWang/cubet" target="_blank" rel="noopener noreferrer">github.com/JermWang/cubet ↗</a></p>
       <ul class="pf-files">
         <li><code>book.mjs</code>: the shared bet book, balances, the ledger and settlement</li>
+        <li><code>payments.mjs</code>, <code>sol.mjs</code>: wallet sign-in, deposits, withdrawals and the treasury</li>
+        <li><code>wallet.js</code>: connects your wallet in the browser, with no third-party SDK</li>
         <li><code>market.mjs</code>: the Solana RPC, DexScreener and GeckoTerminal calls</li>
         <li><code>server.mjs</code>: the API and pages, with no dependencies</li>
         <li><code>app.js</code>, <code>landing.js</code>, <code>proof.js</code>: what runs in your browser</li>

@@ -414,9 +414,9 @@ footer.site{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;m
 .modal-close:hover{color:var(--text);background:var(--soft-hover)}
 .mact{display:flex;flex-wrap:wrap;gap:8px}
 .mact .btn{flex:1 1 auto;min-width:0}
-.demo-label{display:block;margin:18px 0 8px;font-size:12.5px;font-weight:500;color:var(--muted)}
-.demo-input{width:100%;height:50px;padding:0 16px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface-2);font-family:var(--mono);font-size:18px;font-weight:500;outline:none;transition:border-color .2s,box-shadow .3s}
-.demo-input:focus{border-color:rgba(110,150,255,.7);box-shadow:0 0 0 4px rgba(77,124,255,.12)}
+.field-label{display:block;margin:18px 0 8px;font-size:12.5px;font-weight:500;color:var(--muted)}
+.field-input{width:100%;height:50px;padding:0 16px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface-2);font-family:var(--mono);font-size:18px;font-weight:500;outline:none;transition:border-color .2s,box-shadow .3s}
+.field-input:focus{border-color:rgba(110,150,255,.7);box-shadow:0 0 0 4px rgba(77,124,255,.12)}
 #fundError{min-height:20px;margin:10px 0 12px}
 .summary{border-radius:14px;border:1px solid var(--line);overflow:hidden}
 .summary div{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;border-top:1px solid var(--line);font-size:14px}
@@ -529,3 +529,34 @@ footer.site{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;m
 }
 .pf-files{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:8px;font-size:14px;color:var(--muted)}
 .pf-repo{margin:4px 0 0}
+
+/* ---------- wallet: connect, transfers, deposit/withdraw status ---------- */
+.wlist{display:grid;gap:8px;margin:0 0 14px}
+.wbtn{display:flex;align-items:center;gap:12px;width:100%;height:52px;padding:0 14px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface-2);color:var(--text);font:inherit;font-size:15px;font-weight:500;text-align:left;text-decoration:none;cursor:pointer;transition:border-color .2s,background .2s}
+.wbtn:hover{border-color:rgba(110,150,255,.6);background:var(--soft-hover)}
+.wbtn:disabled{opacity:.5;cursor:progress}
+.wbtn img{width:28px;height:28px;border-radius:7px}
+.modal a{color:var(--text-2);text-decoration:underline;text-underline-offset:2px}
+.modal .mh{margin:20px 0 8px;font-size:12px;font-family:var(--mono);font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.txlist{display:grid;gap:2px;margin-bottom:6px}
+.txr{display:grid;grid-template-columns:1fr auto auto auto;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+.txr b{font-family:var(--mono);font-weight:500;color:var(--text)}
+.txs{font-family:var(--mono);font-size:11px}
+.txs.credited,.txs.confirmed{color:var(--up)}
+.txs.failed{color:var(--down)}
+.fundstatus p{margin:10px 0 14px;font-size:13.5px}
+.fundstatus .ok{color:var(--text)}
+.fundstatus .ok svg{color:var(--up);vertical-align:-2px}
+/* proof: the treasury panel */
+.pf-treasury{display:grid;gap:14px}
+.pf-treasury>div{display:grid;grid-template-columns:150px 1fr;gap:4px 14px;align-items:baseline;font-size:14px;color:var(--text-2)}
+.pf-treasury .k{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.pf-treasury .s{grid-column:2;font-size:12.5px;color:var(--muted)}
+.pf-treasury code{word-break:break-all}
+.pf-badge{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-family:var(--mono);font-size:11px;background:var(--soft);color:var(--muted)}
+.pf-badge.ok{background:var(--up-soft);color:var(--up)}
+.pf-badge.bad{background:var(--down-soft);color:var(--down)}
+.pf-tx{grid-template-columns:1.1fr .8fr .9fr .9fr .7fr 1fr}
+#transfers{margin-top:12px}
+#transfers:empty{display:none}
+@media (max-width:600px){.pf-treasury>div{grid-template-columns:1fr}.pf-treasury .s{grid-column:1}}

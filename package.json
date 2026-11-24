@@ -2,11 +2,11 @@
   "name": "cubet",
   "version": "1.0.0",
   "private": true,
-  "description": "Market-cap betting terminal for Solana tokens: live on-chain data, a shared bet book of real players, demo SOL stakes",
+  "description": "Market-cap betting terminal for Solana tokens: wallet sign-in, real SOL deposits and withdrawals, settlement on live market data",
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs",
-    "check": "node --check config.js && node --check data.js && node --check fx.js && node --check art.js && node --check app.js && node --check landing.js && node --check proof.js && node --check market.mjs && node --check book.mjs && node --check server.mjs",
+    "check": "node --check config.js && node --check data.js && node --check fx.js && node --check art.js && node --check app.js && node --check landing.js && node --check proof.js && node --check market.mjs && node --check book.mjs && node --check sol.mjs && node --check payments.mjs && node --check wallet.js && node --check server.mjs",
     "deploy": "railway up --service cubet"
   },
   "engines": {

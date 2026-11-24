@@ -1,18 +1,18 @@
 # cubet
 
-A market-cap betting terminal for any Solana token. Token data is live and checked on-chain, every other player is a real visitor, and the server settles each bet on the real market cap at its expiry. Stakes are demo SOL for now.
+A market-cap betting terminal for any Solana token. Players sign in with their Solana wallet and stake real SOL: deposits go to cubet's treasury wallet and are credited once finalized on-chain, withdrawals go back to the player's own wallet. Token data is live and checked on-chain, and the server settles each bet on the real market cap at its expiry.
 
 - **Live:** https://www.cubetsolana.xyz (also https://cubet-production.up.railway.app)
 - **X:** https://x.com/cubetsol_
 - **`/`**: landing page. Every call to action leads to the terminal.
-- **`/terminal`**: the betting terminal: open bets, My Bets, settled bets, create a bet, leaderboard, demo wallet.
+- **`/terminal`**: the betting terminal: open bets, My Bets, settled bets, create a bet, leaderboard, wallet (connect, deposit, withdraw).
 - **`/proof`**: live checks against the real integrations, every settlement with the price candle it used, and the limits below.
 
 ## What's real and what isn't yet
 
 | Real | Not yet |
 |---|---|
-| Token check: every contract address is verified on-chain (`getAccountInfo`: SPL / Token-2022 mint, decimals, supply, mint and freeze authority) | Stakes are demo SOL: balances are numbers in cubet's database. No wallet connects and nothing is sent on-chain, so there are no bet transactions |
+| Token check: every contract address is verified on-chain (`getAccountInfo`: SPL / Token-2022 mint, decimals, supply, mint and freeze authority) | Custodial: deposited SOL is held in cubet's treasury hot wallet, not an on-chain escrow program. The Proof page shows the treasury balance against everything owed, plus every deposit and withdrawal |
 | Names, symbols, logos, live market caps, 24h change, liquidity, volume (DexScreener) | Settlement runs on cubet's server, not an on-chain program. Every result can be recomputed from the public candle it records |
 | Trending coins and chart history (GeckoTerminal OHLCV) | No cubet token has been launched |
 | Real players: one shared bet book on the server (`book.mjs`). No bots, no sample players | |
@@ -37,7 +37,11 @@ Double-click `START.cmd`, or run `npm start`, then open http://localhost:4174. Y
 | `API_RATE_LIMIT` | `120` | Data API requests per minute per visitor |
 | `NODE_ENV`, `HOST`, `CACHE_MAX_AGE` | `production`, `0.0.0.0`, `3600` | Server |
 | `APP_NAME`, `APP_TITLE`, `APP_TAGLINE`, `APP_FOOTER` | filled | Branding (public) |
-| `CURRENCY`, `STORAGE_KEY`, `MAX_DEPOSIT`, `DEFAULT_STAKE` | filled | Demo economy (public). `MAX_DEPOSIT` is the daily demo deposit limit per player, enforced by the server |
+| `TREASURY_SECRET_KEY` | **secret, blank** | Treasury wallet key. Blank = payments off (no deposits, withdrawals or bets) |
+| `FEE_WALLET`, `FEE_BPS`, `FEE_SWEEP_MIN` | blank / 0 / 0.1 | Fee on settled pots (basis points), swept to `FEE_WALLET` |
+| `MIN_STAKE`, `MAX_STAKE`, `MIN_DEPOSIT`, `MIN_WITHDRAW`, `MAX_WITHDRAW_PER_DAY`, `WITHDRAWALS_PAUSED`, `MIN_LIQUIDITY_USD` | filled | Money limits, enforced by the server |
+| `SOLANA_CLUSTER`, `PAYMENTS_RPC_URL` | mainnet-beta / blank | Payments network; RPC defaults to `SOLANA_RPC_URL` |
+| `CURRENCY`, `STORAGE_KEY`, `DEFAULT_STAKE` | filled | Display (public) |
 | `ART_BOIL` | `false` | Optional hand-drawn wobble on the hero scene |
 | `PORT` | injected by Railway | Don't set it |
 
@@ -117,12 +121,15 @@ Players are anonymous: `POST /api/session` sets an HttpOnly `cubet_sid` cookie (
 
 | Route | Does |
 |---|---|
-| `GET /api/me` · `POST /api/session` | This browser's player (`handle`, demo `balance`) |
-| `POST /api/funds` `{mode, amount}` | Demo deposit (daily limit) or withdrawal |
+| `GET /api/me` | The signed-in wallet's player (`wallet`, `handle`, `balance` in SOL), or null |
+| `POST /api/auth/nonce` `{wallet}` · `POST /api/auth/verify` `{wallet, nonce, signature}` · `POST /api/auth/logout` | Sign in by signing a one-time message with the wallet (ed25519, verified server-side) |
+| `GET /api/pay/config` · `/api/pay/status` · `/api/pay/transfers` | Treasury address and limits; on-chain balance vs. everything owed; every deposit and withdrawal |
+| `GET /api/pay/mine` · `/api/pay/blockhash` | The player's transfers and ledger; a blockhash for building the deposit transfer |
+| `POST /api/pay/deposit` `{signature}` · `/api/pay/withdraw` `{amount}` · `/api/pay/relay` `{tx}` | Report a sent deposit (credited once finalized); withdraw to the signed-in wallet; relay a wallet-signed deposit |
 | `GET /api/book` | Open and in-play bets for everyone, your finished bets, recent settlements, stats |
 | `POST /api/bets` `{mint, dir, target, duration, stake}` | Create a bet. The server re-checks the token and the target against the live cap |
 | `POST /api/bets/:id/take` · `/cancel` | Take the other side (open until a quarter of the time is left) or cancel your open bet |
-| `GET /api/leaderboard` · `/api/settlements` · `/api/stats` | Rankings by demo P/L, settlement records, book totals |
+| `GET /api/leaderboard` · `/api/settlements` · `/api/stats` | Rankings by SOL P/L, settlement records, book totals |
 
 ### Terminal deep links
 

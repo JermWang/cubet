@@ -35,17 +35,32 @@ export default defineRailway(() => {
       APP_NAME: "cubet",
       APP_TITLE: "cubet — stack your call",
       APP_TAGLINE: "Set a market-cap target, find someone who disagrees, and the winner takes the whole stack.",
-      APP_FOOTER: "cubet · live Solana market data · demo SOL",
+      APP_FOOTER: "cubet · live Solana market data · real SOL",
 
       // Token. The official contract address for the splash page's copy button. Fill it in on the
       // Railway dashboard at launch; blank shows "coming soon".
       TOKEN_CA: preserve(),
 
-      // Demo economy
+      // Real SOL. Secrets and money settings are filled in on the Railway dashboard and kept by preserve():
+      //   TREASURY_SECRET_KEY  the treasury wallet's secret key (blank = payments off, no bets)
+      //   FEE_WALLET           where fees are swept      FEE_BPS  fee on settled pots (200 = 2%)
+      TREASURY_SECRET_KEY: preserve(),
+      FEE_WALLET: preserve(),
+      FEE_BPS: preserve(),
+      PAYMENTS_RPC_URL: preserve(),
+      SOLANA_CLUSTER: "mainnet-beta",
+      FEE_SWEEP_MIN: "0.1",
+      MIN_STAKE: "0.01",
+      MAX_STAKE: preserve(),
+      MIN_DEPOSIT: "0.01",
+      MIN_WITHDRAW: "0.02",
+      MAX_WITHDRAW_PER_DAY: preserve(),
+      WITHDRAWALS_PAUSED: preserve(),
+      MIN_LIQUIDITY_USD: "20000",
+
+      // Display
       CURRENCY: "SOL",
       STORAGE_KEY: "cubet-v2",
-      STARTING_BALANCE: "1",   // demo SOL each new player starts with
-      MAX_DEPOSIT: "1000",
       DEFAULT_STAKE: "0.1",
 
       // Art

@@ -1,14 +1,15 @@
 /* cubet: settings.
    Token names, logos, market caps and charts are live on-chain/market data fetched through /api.
    Bets, balances and settlement live in the shared bet book on the server (book.mjs); every player is real.
-   This file only decides which coins to feature, the copy, and the demo-SOL limits shown in the UI.
+   Stakes are real SOL (payments.mjs). This file only decides which coins to feature, the copy, and defaults shown in the UI;
+   the server enforces the real limits.
    Colours live at the top of styles.css; drawings live in art.js and fx.js. */
 window.CUBET = {
   brand: {
     name: 'cubet',
     title: 'cubet — stack your call',
     tagline: 'Set a market-cap target, find someone who disagrees, and the winner takes the whole stack.',
-    footer: 'cubet · live Solana market data · demo SOL',
+    footer: 'cubet · live Solana market data · real SOL',
   },
 
   // The official cubet token. One place for the contract address: the splash page's copy button reads it,
@@ -19,10 +20,8 @@ window.CUBET = {
 
   currency: 'SOL',
   storageKey: 'cubet-v2',       // browser key for the theme preference only
-  startingBalance: 1,           // demo SOL every new player starts with (credited by the server)
-  maxDeposit: 1000,             // demo SOL a player can add per day (enforced on the server)
-  minStake: 0.01,               // stake limits (enforced on the server)
-  maxStake: 100,
+  minStake: 0.01,               // stake limits shown in the UI (MIN_STAKE / MAX_STAKE, enforced on the server)
+  maxStake: 10,
   defaultStake: 0.1,
   refreshSeconds: 20,           // how often live market caps refresh in the terminal
 

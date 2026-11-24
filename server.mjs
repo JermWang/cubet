@@ -6,7 +6,10 @@
 //   Data      /api/token/:mint   /api/tokens?mints=a,b   /api/trending
 //             /api/chart/:mint?tf=1h|1d|1w|1m   /api/cap-at/:mint?t=<unix seconds>
 //   Book      GET  /api/me  /api/book  /api/leaderboard  /api/settlements  /api/stats
-//             POST /api/session  /api/funds  /api/bets  /api/bets/:id/take  /api/bets/:id/cancel
+//             POST /api/bets  /api/bets/:id/take  /api/bets/:id/cancel
+//   Wallet    POST /api/auth/nonce  /api/auth/verify  /api/auth/logout
+//   Payments  GET  /api/pay/status  /api/pay/config  /api/pay/transfers  /api/pay/mine  /api/pay/blockhash
+//             POST /api/pay/deposit  /api/pay/withdraw  /api/pay/relay
 //   Ops       /healthz   /runtime-config.js
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -15,6 +18,7 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { createMarket, HttpError } from './market.mjs';
 import { createBook, BookError } from './book.mjs';
+import { createPayments } from './payments.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 try { process.loadEnvFile(path.join(root, '.env')); } catch { /* no .env file: use the real environment */ }
@@ -48,8 +52,24 @@ const market = createMarket({
 const book = createBook({
   dbPath: str('DB_PATH', path.join(root, 'data', 'cubet.db')),
   market,
-  startingBalance: num('STARTING_BALANCE', 1),
-  maxDeposit: num('MAX_DEPOSIT', 1000),
+  minStake: num('MIN_STAKE', 0.01),
+  maxStake: num('MAX_STAKE', 10),
+  feeBps: Math.max(0, Math.min(1000, num('FEE_BPS', 0))),
+  minLiquidityUsd: num('MIN_LIQUIDITY_USD', 20000),
+});
+// Real SOL in and out of the treasury wallet. Off (no deposits, withdrawals or new bets) until TREASURY_SECRET_KEY is set.
+const payments = createPayments({
+  book,
+  rpcUrl: str('PAYMENTS_RPC_URL') || str('SOLANA_RPC_URL', 'https://api.mainnet-beta.solana.com'),
+  cluster: str('SOLANA_CLUSTER', 'mainnet-beta'),
+  treasurySecret: str('TREASURY_SECRET_KEY'),
+  feeWallet: str('FEE_WALLET'),
+  minDeposit: num('MIN_DEPOSIT', 0.01),
+  minWithdraw: num('MIN_WITHDRAW', 0.02),
+  maxWithdrawPerDay: num('MAX_WITHDRAW_PER_DAY', 25),
+  withdrawalsPaused: bool('WITHDRAWALS_PAUSED', false),
+  feeSweepMin: num('FEE_SWEEP_MIN', 0.1),
+  domain: (str('PUBLIC_URL', env.RAILWAY_PUBLIC_DOMAIN ? `https://${env.RAILWAY_PUBLIC_DOMAIN}` : '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')) || `localhost:${num('PORT', 4174)}`,
 });
 const SESSION = 'cubet_sid';
 
@@ -62,9 +82,9 @@ const publicConfig = Object.fromEntries(Object.entries({
   token: str('TOKEN_CA') ? { ca: str('TOKEN_CA') } : undefined,
   currency: str('CURRENCY') || undefined,
   storageKey: str('STORAGE_KEY') || undefined,
-  startingBalance: num('STARTING_BALANCE', undefined),
-  maxDeposit: num('MAX_DEPOSIT', undefined),
   defaultStake: num('DEFAULT_STAKE', undefined),
+  minStake: num('MIN_STAKE', undefined),
+  maxStake: num('MAX_STAKE', undefined),
   motion: env.ART_BOIL ? { boil: bool('ART_BOIL', true) } : undefined,
 }).filter(([, v]) => v !== undefined));
 
@@ -85,7 +105,7 @@ const compressible = /^(text\/|application\/json|image\/svg)/;
 const PUBLIC_FILES = new Set([
   'index.html', 'terminal.html', 'styles.css', 'landing.css', 'fonts.css',
   'config.js', 'data.js', 'fx.js', 'art.js', 'app.js', 'landing.js', 'favicon.svg', 'robots.txt', 'og.png',
-  'proof.html', 'proof.js',
+  'proof.html', 'proof.js', 'wallet.js',
 ]);
 const isPublic = rel => PUBLIC_FILES.has(rel) || /^fonts\/[\w.-]+\.woff2$/.test(rel);
 const ROUTES = { '/': 'index.html', '/terminal': 'terminal.html', '/terminal/': 'terminal.html', '/proof': 'proof.html', '/proof/': 'proof.html' };
@@ -104,7 +124,7 @@ const escAttr = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&l
 function renderPage(html, rel) {
   const name = brand.name || 'cubet';
   const title = rel === 'terminal.html' ? `Terminal · ${name}` : rel === 'proof.html' ? `Proof · ${name}` : brand.title || 'cubet — stack your call';
-  const desc = brand.tagline || 'A market-cap betting terminal for any Solana token. Live data, demo SOL stakes for now.';
+  const desc = brand.tagline || 'A market-cap betting terminal for any Solana token. Connect a wallet, stake real SOL, and the winner takes the pot.';
   const url = PUBLIC_URL && (rel === 'terminal.html' ? `${PUBLIC_URL}/terminal` : rel === 'proof.html' ? `${PUBLIC_URL}/proof` : `${PUBLIC_URL}/`);
   const meta = [
     `<meta property="og:type" content="website">`,
@@ -159,7 +179,8 @@ function allow(req) {
 }
 
 const cookies = req => Object.fromEntries((req.headers.cookie || '').split(';').map(c => c.trim().split('=')).filter(([k, v]) => k && v));
-const sessionCookie = s => `${SESSION}=${s}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${PROD ? '; Secure' : ''}`;
+const sessionCookie = s => `${SESSION}=${s}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 86400}${PROD ? '; Secure' : ''}`;
+const clearCookie = `${SESSION}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${PROD ? '; Secure' : ''}`;
 
 // POSTs only from our own pages: JSON body, same origin, small.
 function readJson(req) {
@@ -192,17 +213,40 @@ async function bookApi(req, res, route, arg, action, query) {
   }
   if (req.method !== 'POST') return sendJson(req, res, 405, { error: 'method', message: 'Method not allowed.' });
   const body = await readJson(req);
-  if (route === 'session') {
-    if (viewer) return sendJson(req, res, 200, { player: book.me(viewer) });
-    const [session, p] = book.newPlayer();
-    return sendJson(req, res, 201, { player: book.me(p) }, 0, { 'Set-Cookie': sessionCookie(session) });
-  }
-  if (!viewer) throw new BookError(401, 'no_session', 'Reload the page to start a session.');
-  const fresh = () => book.me(book.player(cookies(req)[SESSION]));
-  if (route === 'funds') return sendJson(req, res, 200, { player: book.funds(viewer, body.mode, body.amount) });
+  if (!viewer) throw new BookError(401, 'no_session', 'Connect your wallet first.');
+  const fresh = () => book.me(book.refresh(viewer));
+  // Creating and taking bets moves real SOL, so both need payments switched on.
+  if (route === 'bets' && action !== 'cancel' && !payments.enabled) throw new BookError(503, 'payments_off', 'Betting opens when deposits are switched on.');
   if (route === 'bets' && !arg) { const id = await book.create(viewer, body); return sendJson(req, res, 201, { id, player: fresh() }); }
   if (route === 'bets' && arg && action === 'take') { book.take(viewer, arg); return sendJson(req, res, 200, { ok: true, player: fresh() }); }
   if (route === 'bets' && arg && action === 'cancel') { book.cancel(viewer, arg); return sendJson(req, res, 200, { ok: true, player: fresh() }); }
+  return null;
+}
+
+// Wallet sign-in and real-SOL payments.
+async function payApi(req, res, route, arg, query) {
+  const session = cookies(req)[SESSION], viewer = book.player(session);
+  const need = () => { if (!viewer) throw new BookError(401, 'no_session', 'Connect your wallet first.'); return viewer; };
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    if (route === 'pay' && arg === 'status') return sendJson(req, res, 200, await payments.status());
+    if (route === 'pay' && arg === 'config') return sendJson(req, res, 200, payments.publicConfig());
+    if (route === 'pay' && arg === 'transfers') return sendJson(req, res, 200, payments.transfers(Number(query.get('limit')) || 25));
+    if (route === 'pay' && arg === 'mine') return sendJson(req, res, 200, { ...payments.mine(need()), ledger: book.history(viewer, 30) });
+    if (route === 'pay' && arg === 'blockhash') { need(); return sendJson(req, res, 200, await payments.blockhash()); }
+    return null;
+  }
+  if (req.method !== 'POST') return sendJson(req, res, 405, { error: 'method', message: 'Method not allowed.' });
+  const body = await readJson(req);
+  if (route === 'auth' && arg === 'nonce') return sendJson(req, res, 200, payments.challenge(String(body.wallet || '')));
+  if (route === 'auth' && arg === 'verify') {
+    const out = payments.verifySignIn(String(body.wallet || ''), body.nonce, String(body.signature || ''));
+    book.signOut(session);
+    return sendJson(req, res, 200, { player: book.me(out.player), isNew: out.isNew }, 0, { 'Set-Cookie': sessionCookie(out.session) });
+  }
+  if (route === 'auth' && arg === 'logout') { book.signOut(session); return sendJson(req, res, 200, { ok: true }, 0, { 'Set-Cookie': clearCookie }); }
+  if (route === 'pay' && arg === 'deposit') return sendJson(req, res, 200, await payments.reportDeposit(need(), String(body.signature || '')));
+  if (route === 'pay' && arg === 'withdraw') { const w = await payments.withdraw(need(), Number(body.amount)); return sendJson(req, res, 200, { ...w, url: payments.explorer(w.signature), player: book.me(book.refresh(viewer)) }); }
+  if (route === 'pay' && arg === 'relay') { need(); return sendJson(req, res, 200, await payments.relay(body.tx)); }
   return null;
 }
 
@@ -210,7 +254,12 @@ async function api(req, res, pathname, query) {
   if (!allow(req)) return sendJson(req, res, 429, { error: 'rate_limited', message: 'Slow down a little and try again.' });
   const [, , route, arg, action] = pathname.split('/'); // ['', 'api', route, arg, action]
   try {
-    if (['me', 'book', 'leaderboard', 'settlements', 'stats', 'session', 'funds', 'bets'].includes(route)) {
+    if (route === 'auth' || route === 'pay') {
+      const handled = await payApi(req, res, route, arg, query);
+      if (handled !== null) return handled;
+      return sendJson(req, res, 404, { error: 'not_found', message: 'Unknown API route.' });
+    }
+    if (['me', 'book', 'leaderboard', 'settlements', 'stats', 'bets'].includes(route)) {
       const handled = await bookApi(req, res, route, arg, action, query);
       if (handled !== null) return handled;
       return sendJson(req, res, 404, { error: 'not_found', message: 'Unknown API route.' });
@@ -233,7 +282,8 @@ async function api(req, res, pathname, query) {
   } catch (err) {
     if (err instanceof HttpError || err instanceof BookError) return sendJson(req, res, err.status, { error: err.code, message: err.message });
     console.error('api error', pathname, err);
-    return sendJson(req, res, 500, { error: 'server_error', message: 'Something went wrong fetching market data.' });
+    const rpcFail = /^RPC |fetch failed|aborted|timeout/i.test(err?.message || '');
+    return sendJson(req, res, rpcFail ? 502 : 500, { error: rpcFail ? 'rpc_error' : 'server_error', message: rpcFail ? 'The Solana network did not answer. Try again in a moment.' : 'Something went wrong. Try again.' });
   }
 }
 
@@ -277,8 +327,12 @@ server.on('error', err => { console.error(err.message); process.exitCode = 1; })
 // Settle every expired bet on the real market cap at its expiry, every 15 seconds.
 const settleTimer = setInterval(() => book.settleDue().catch(err => console.error('settle loop', err)), 15_000);
 book.settleDue().catch(err => console.error('settle loop', err));
+// Credit finalized deposits to the treasury, and confirm / re-send / refund pending withdrawals.
+const scanTimer = setInterval(() => payments.scan(), 20_000);
+const reconcileTimer = setInterval(() => payments.reconcile(), 6_000);
+payments.scan(); payments.reconcile();
 
 // Railway sends SIGTERM on redeploy: finish in-flight requests, then exit.
 for (const sig of ['SIGTERM', 'SIGINT']) {
-  process.on(sig, () => { clearInterval(settleTimer); server.close(() => process.exit(0)); setTimeout(() => process.exit(0), 5000).unref(); });
+  process.on(sig, () => { clearInterval(settleTimer); clearInterval(scanTimer); clearInterval(reconcileTimer); server.close(() => process.exit(0)); setTimeout(() => process.exit(0), 5000).unref(); });
 }

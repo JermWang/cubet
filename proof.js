@@ -19,7 +19,7 @@ $('[data-solscan]').href = D.explorer(MINT);
 // The official token, from the same TOKEN_CA setting as the splash page's copy button.
 const TOKEN_CA = String(cfg.token?.ca || '').trim();
 if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(TOKEN_CA)) {
-  $('#pfToken').innerHTML = `<b>The cubet token isn't used in betting yet.</b> The official token is <a href="${esc(D.explorer(TOKEN_CA))}" target="_blank" rel="noopener noreferrer"><code>${esc(TOKEN_CA)}</code></a>. Stakes are still demo SOL. Any other token claiming to be cubet's is not ours; the address is also posted on <a href="https://x.com/cubetsol_" target="_blank" rel="noopener noreferrer">@cubetsol_</a>.`;
+  $('#pfToken').innerHTML = `<b>The cubet token isn't used in betting yet.</b> The official token is <a href="${esc(D.explorer(TOKEN_CA))}" target="_blank" rel="noopener noreferrer"><code>${esc(TOKEN_CA)}</code></a>. Bets are staked in SOL, not in the token. Any other token claiming to be cubet's is not ours; the address is also posted on <a href="https://x.com/cubetsol_" target="_blank" rel="noopener noreferrer">@cubetsol_</a>.`;
 }
 
 // Raw fetch so the page shows exactly what the server returned, status and timing included.
@@ -79,7 +79,7 @@ async function settlements() {
           : `Live DexScreener cap at settlement${pool ? ` · <a href="${pool}" target="_blank" rel="noopener noreferrer">pool ↗</a>` : ''}`;
       const result = b.state === 'void'
         ? 'Void · both refunded'
-        : `${b.creatorWon ? esc(b.owner) : esc(b.taker)} won ${Number((b.stake * 2).toFixed(4))} ${esc(cfg.currency)}`;
+        : `${b.creatorWon ? esc(b.owner) : esc(b.taker)} won ${Number((b.stake * 2 - (b.fee || 0)).toFixed(6))} ${esc(cfg.currency)}`;
       return `<div class="pf-tr" id="s-${esc(b.id)}">
         <span data-l="Ended">${esc(utc(b.expiresAt))}</span>
         <span data-l="Coin" class="pf-coin">${art.token(b.token)}<a href="${D.explorer(b.token.ca)}" target="_blank" rel="noopener noreferrer">${esc(b.token.symbol)}</a></span>
@@ -92,6 +92,42 @@ async function settlements() {
   if (location.hash.startsWith('#s-')) document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'center' });
 }
 
+/* ---------- treasury: on-chain balance vs. what cubet owes, and every transfer ---------- */
+const sol = n => `${Number(Number(n).toFixed(6))} ${cfg.currency}`;
+async function treasury() {
+  const host = $('#treasury'), list = $('#transfers');
+  let st;
+  try { st = await D.payStatus(); }
+  catch (err) { host.innerHTML = `<p class="pf-empty">${esc(err.message)}</p>`; return; }
+  if (!st.enabled) {
+    host.innerHTML = '<p>Deposits and withdrawals are not switched on yet, so the treasury holds no player funds and no bets can be placed. This section shows the treasury wallet and its balance as soon as they are.</p>';
+    return;
+  }
+  const acct = D.account(st.treasury, st.cluster);
+  const badge = st.solvent == null ? '<span class="pf-badge">balance unavailable</span>' : st.solvent ? '<span class="pf-badge ok">fully covered</span>' : '<span class="pf-badge bad">short</span>';
+  host.innerHTML = `<div class="pf-treasury">
+      <div><span class="k">Treasury wallet</span><a href="${esc(acct)}" target="_blank" rel="noopener noreferrer"><code>${esc(st.treasury)}</code> ↗</a></div>
+      <div><span class="k">On-chain balance</span><span><b>${st.treasuryBalance == null ? '—' : sol(st.treasuryBalance)}</b>${badge}</span></div>
+      <div><span class="k">cubet owes</span><b>${sol(st.owed.total)}</b><span class="s">${sol(st.owed.balances)} in player balances · ${sol(st.owed.lockedInBets)} locked in bets · ${sol(st.owed.pendingWithdrawals)} withdrawals in flight · ${sol(st.owed.houseFees)} unswept fees</span></div>
+      <div><span class="k">All time</span><span>${st.totals.deposits} deposits (${sol(st.totals.deposited)}) · ${st.totals.withdrawals} withdrawals (${sol(st.totals.withdrawn)})</span></div>
+      <div><span class="k">Rules</span><span>Fee on settled pots: ${st.feeBps / 100}% · stakes ${st.minStake}–${st.maxStake} ${esc(cfg.currency)} · withdrawals up to ${st.maxWithdrawPerDay} ${esc(cfg.currency)} per 24 h, ${st.networkFee} ${esc(cfg.currency)} network fee</span></div>
+    </div>`;
+  let tx;
+  try { tx = await D.transfers(50); } catch { return; }
+  const rows = [...tx.deposits.map(d => ({ ...d, kind: 'Deposit', who: d.from, sign: '+' })), ...tx.withdrawals.map(w => ({ ...w, kind: w.kind === 'fee sweep' ? 'Fee sweep' : 'Withdrawal', who: w.to, sign: '−' }))]
+    .sort((a, b) => (b.at || 0) - (a.at || 0));
+  list.innerHTML = rows.length
+    ? `<div class="pf-tr pf-th pf-tx"><span>Time</span><span>Type</span><span>Wallet</span><span>Amount</span><span>Status</span><span>Transaction</span></div>` +
+      rows.map(r => `<div class="pf-tr pf-tx">
+        <span data-l="Time">${r.at ? esc(utc(r.at)) : '—'}</span><span data-l="Type">${r.kind}</span>
+        <span data-l="Wallet"><a href="${esc(D.account(r.who, st.cluster))}" target="_blank" rel="noopener noreferrer">${esc(r.who.slice(0, 4))}…${esc(r.who.slice(-4))}</a></span>
+        <span data-l="Amount"><b>${r.sign}${sol(r.amount)}</b></span><span data-l="Status">${esc(r.status)}</span>
+        <span data-l="Transaction"><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.signature.slice(0, 8))}… ↗</a></span>
+      </div>`).join('')
+    : '<p class="pf-empty">No deposits or withdrawals yet. Each one appears here with its Solana transaction.</p>';
+}
+
 settlements();
+treasury();
 checks.token().catch(() => {});
 })();

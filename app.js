@@ -1,7 +1,9 @@
 /* cubet terminal.
    Tokens, logos, market caps and charts are live (see data.js / market.mjs). Every bet lives in the
    shared bet book on the server (book.mjs): every other player is a real visitor, nothing is simulated,
-   and the server settles each bet on the real market cap at its exact expiry. Stakes are demo SOL.
+   and the server settles each bet on the real market cap at its exact expiry. Stakes are real SOL:
+   players sign in with their Solana wallet, deposit to cubet's treasury and withdraw to their own wallet
+   (wallet.js in the browser, payments.mjs on the server).
 
    How clicks work: any element with data-action="name" runs actions[name](element).
    Settings: config.js · Drawings: art.js · Effects: fx.js · Looks: styles.css */
@@ -11,6 +13,8 @@
 const cfg = window.CUBET;
 const art = window.Art;
 const D = window.CubetData;
+const W = window.CubetWallet;
+const LAMPORTS = 1e9;
 const CUR = cfg.currency;
 
 /* ---------- helpers ---------- */
@@ -18,7 +22,7 @@ const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = D.money;
-const amt = n => Number(Number(n).toFixed(4)).toString();
+const amt = n => Number(Number(n).toFixed(n !== 0 && Math.abs(n) < 0.001 ? 6 : 4)).toString();
 const coins = n => `${amt(n)} ${CUR}`;
 const signed = n => (n > 0 ? '+' : '') + coins(n);
 const shortCa = ca => `${ca.slice(0, 4)}…${ca.slice(-4)}`;
@@ -40,7 +44,7 @@ function timeLeft(ms) {
    The bet book, balances and settlement live on the server. Only the theme is kept in this browser. */
 const THEME_KEY = `${cfg.storageKey}-theme`;
 const savedTheme = (() => { try { return localStorage.getItem(THEME_KEY) || 'dark'; } catch { return 'dark'; } })();
-const state = { me: null, balance: 0, bets: [], stats: null, theme: savedTheme };
+const state = { me: null, balance: 0, bets: [], stats: null, theme: savedTheme, pay: null };
 const ui = { tab: 'open', step: 1, draft: {}, chartTf: '1d', loading: true, dataError: null, busy: false };
 const live = {};             // mint → latest market data
 let toastTimer, returnFocus;
@@ -57,8 +61,13 @@ function applyBrand() {
 }
 function applyTheme() { document.documentElement.dataset.theme = state.theme || 'dark'; }
 function renderBalance() {
-  $('#balpill b').textContent = coins(state.balance);
-  $('#balpill2 b').textContent = coins(state.balance);
+  const signedIn = Boolean(state.me);
+  $('#balpill b').textContent = signedIn ? coins(state.balance) : 'Connect wallet';
+  $('#balpill').setAttribute('aria-label', signedIn ? `Your wallet, ${coins(state.balance)}` : 'Connect your Solana wallet');
+  $('#balpill2 b').textContent = signedIn ? coins(state.balance) : 'not connected';
+  $$('[data-signed-in]').forEach(el => { el.hidden = !signedIn; });
+  const note = $('#payNote');
+  if (note && state.pay) note.hidden = state.pay.enabled;
 }
 function renderStats() {
   const s = state.stats || { open: 0, openPot: 0, inPlay: 0, players: 0 };
@@ -80,7 +89,7 @@ function progress(b, cap) {
 
 function actionFor(b) {
   if (b.state === 'settled') {
-    if (b.won === true) return `<span class="pill win">Won ${coins(b.stake * 2)}</span>`;
+    if (b.won === true) return `<span class="pill win">Won ${coins(b.stake * 2 - (b.fee || 0))}</span>`;
     if (b.won === false) return '<span class="pill lose">Lost</span>';
     return `<span class="pill neutral">${b.creatorWon ? 'Creator won' : 'Taker won'}</span>`;
   }
@@ -125,9 +134,9 @@ function row(b, i) {
       <div class="rowp">
         <div class="rowp-say">
           <p class="rowp-head">${sym} must finish <b>${b.dir} ${money(b.target)}</b> at ${new Date(b.expiresAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} for the creator to win.</p>
-          <p class="rowp-rule">${rule} Both sides are real players. Stakes are demo ${CUR}.${b.state === 'settled' ? ` <a href="/proof#s-${id}">How it settled</a>` : ''}</p>
+          <p class="rowp-rule">${rule} Both sides are real wallets staking real ${CUR}.${b.state === 'settled' ? ` <a href="/proof#s-${id}">How it settled</a>` : ''}</p>
         </div>
-        <div class="rowp-stat"><span class="k">Prize pool</span><span class="v">${coins(b.stake * 2)}</span></div>
+        <div class="rowp-stat"><span class="k">Prize pool</span><span class="v">${coins(b.stake * 2)}</span>${feeLine(b.stake * 2)}</div>
       </div>
     </div>
   </article>`;
@@ -209,7 +218,7 @@ function announce(before, after) {
     const old = before.get(b.id);
     if (!old || !b.mine || old.state === b.state) continue;
     if (b.state === 'active' && b.ownerIsMe) toast(`${b.taker} took your ${b.token.symbol} bet.`);
-    else if (b.state === 'settled') { toast(b.won ? `You won ${coins(b.stake * 2)} on ${b.token.symbol}!` : `${b.token.symbol} settled at ${money(b.settledCap)}. You lost this one.`); if (b.won) burst(); }
+    else if (b.state === 'settled') { toast(b.won ? `You won ${coins(b.stake * 2 - (b.fee || 0))} on ${b.token.symbol}!` : `${b.token.symbol} settled at ${money(b.settledCap)}. You lost this one.`); if (b.won) burst(); }
     else if (b.state === 'expired') toast(`No one took your ${b.token.symbol} bet. Stake refunded.`);
     else if (b.state === 'void') toast(`${b.token.symbol}: no market data at expiry, so the bet is void and both stakes were refunded.`);
   }
@@ -363,31 +372,97 @@ async function chartModal(b) {
 }
 
 /* ---------- wallet + money modals ---------- */
-function walletModal() {
-  openModal('Your demo wallet', `<p>You play as <b>${esc(state.me?.handle || '…')}</b>. Demo balance: <b>${coins(state.balance)}</b>.</p>
-    <p class="note">Every new player starts with ${cfg.startingBalance} demo ${CUR}. Your balance and bets are kept in cubet's bet book on the server, linked to this browser by a cookie. Stakes are demo ${CUR}: nothing is sent on-chain and no wallet connects. Every other player is a real visitor.</p>
-    <div class="mact"><button class="btn" type="button" data-action="deposit">Deposit</button><button class="btn ghost" type="button" data-action="withdraw">Withdraw</button></div>
-    <label class="demo-label" for="theme">Appearance</label>
-    <div class="selwrap"><select id="theme" class="sel full">${['dark', 'light', 'auto'].map(t => `<option value="${t}" ${state.theme === t ? 'selected' : ''}>${t === 'auto' ? 'System' : t === 'dark' ? 'Dark' : 'Light'}</option>`).join('')}</select>${chevron}</div>`);
+const feePct = () => (state.pay?.feeBps || 0) / 100;
+const feeLine = pot => feePct() ? `<span class="s">${feePct()}% fee on the pot · winner gets ${coins(pot * (1 - feePct() / 100))}</span>` : '';
+const shortW = w => `${w.slice(0, 4)}…${w.slice(-4)}`;
+const acctLink = w => `<a href="${D.account(w, state.pay?.cluster)}" target="_blank" rel="noopener noreferrer">${esc(shortW(w))} ${outIcon}</a>`;
+const txLink = (url, label = 'View on Solscan') => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ${outIcon}</a>`;
+const payOff = () => state.pay && !state.pay.enabled;
+
+function connectModal(next) {
+  ui.afterConnect = next || null;
+  const list = W.list();
+  const body = list.length
+    ? `<div class="wlist">${list.map(w => `<button class="wbtn" type="button" data-action="connect-wallet" data-name="${esc(w.name)}">${w.icon ? `<img src="${esc(w.icon)}" alt="" width="28" height="28">` : ''}<span>${esc(w.name)}</span></button>`).join('')}</div>
+       <p class="note">You'll sign a one-time message to prove you own the wallet. Signing is free and is not a transaction.</p>`
+    : W.isMobile()
+      ? `<p>Open cubet inside your wallet app to connect:</p><div class="wlist">${W.mobileLinks().map(l => `<a class="wbtn" href="${esc(l.url)}">${esc(l.name)}</a>`).join('')}</div>`
+      : `<p>No Solana wallet was found in this browser. Install one, then reload this page:</p>
+         <div class="wlist"><a class="wbtn" href="https://phantom.com/download" target="_blank" rel="noopener noreferrer">Phantom</a><a class="wbtn" href="https://solflare.com/download" target="_blank" rel="noopener noreferrer">Solflare</a><a class="wbtn" href="https://backpack.app/download" target="_blank" rel="noopener noreferrer">Backpack</a></div>`;
+  openModal('Connect a Solana wallet', `${body}<p id="connectError" class="err" role="alert"></p>`);
 }
+// Only signed-in wallets can bet; this runs `fn` now, or after the player connects.
+const withWallet = fn => (state.me ? fn() : connectModal(fn));
+
+async function walletModal() {
+  if (!state.me) return connectModal();
+  const w = state.me.wallet;
+  openModal('Your wallet', `<p>Signed in as <b>${acctLink(w)}</b></p>
+    <div class="summary"><div class="hl"><span>cubet balance</span><b>${coins(state.balance)}</b></div></div>
+    ${payOff() ? '<p class="note">Deposits and withdrawals are not switched on yet.</p>' : ''}
+    <div class="mact"><button class="btn" type="button" data-action="deposit">Deposit</button><button class="btn ghost" type="button" data-action="withdraw">Withdraw</button></div>
+    <h4 class="mh">Recent transfers</h4><div class="txlist" id="txList"><p class="note"><span class="spinner" aria-hidden="true"></span>Loading…</p></div>
+    <label class="field-label" for="theme">Appearance</label>
+    <div class="selwrap"><select id="theme" class="sel full">${['dark', 'light', 'auto'].map(t => `<option value="${t}" ${state.theme === t ? 'selected' : ''}>${t === 'auto' ? 'System' : t === 'dark' ? 'Dark' : 'Light'}</option>`).join('')}</select>${chevron}</div>
+    <div class="mact"><button class="btn ghost" type="button" data-action="disconnect">Disconnect</button></div>`);
+  try {
+    const mine = await D.myTransfers();
+    const rows = [...mine.deposits.map(d => ({ ...d, kind: 'Deposit', sign: '+' })), ...mine.withdrawals.map(x => ({ ...x, kind: 'Withdrawal', sign: '−' }))]
+      .sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 8);
+    if ($('#txList')) $('#txList').innerHTML = rows.length
+      ? rows.map(r => `<div class="txr"><span>${r.kind}</span><b>${r.sign}${coins(r.amount)}</b><span class="txs ${esc(r.status)}">${esc(r.status)}</span>${txLink(r.url, 'tx')}</div>`).join('')
+      : '<p class="note">No deposits or withdrawals yet.</p>';
+  } catch (err) { if ($('#txList')) $('#txList').innerHTML = `<p class="err">${esc(err.message)}</p>`; }
+}
+
 function fundsModal(mode) {
-  const dep = mode === 'deposit';
-  openModal(dep ? `Deposit demo ${CUR}` : `Withdraw demo ${CUR}`, `<p>${dep ? `Add demo ${CUR} to create and take bets (up to ${cfg.maxDeposit} a day).` : `Remove demo ${CUR} from your available balance.`}</p>
+  if (!state.me) return connectModal(() => fundsModal(mode));
+  if (payOff()) return toast('Deposits and withdrawals are not switched on yet.');
+  const dep = mode === 'deposit', p = state.pay || {};
+  const max = dep ? '' : `max="${state.balance}"`;
+  openModal(dep ? `Deposit ${CUR}` : `Withdraw ${CUR}`, `${dep
+      ? `<p>Send ${CUR} from your connected wallet ${acctLink(state.me.wallet)} to cubet's treasury ${p.treasury ? acctLink(p.treasury) : ''}. It's added to your balance once Solana finalizes it, usually within 30 seconds.</p>`
+      : `<p>${CUR} goes from cubet's treasury to your wallet ${acctLink(state.me.wallet)}. Withdrawals only ever go to the wallet you signed in with.</p>`}
     <form id="fundForm" data-mode="${mode}" novalidate>
-      <label class="demo-label" for="fundAmount">Amount (${CUR})</label>
-      <input id="fundAmount" class="demo-input" type="number" min="0.0001" max="${dep ? cfg.maxDeposit : state.balance}" step="0.0001" value="${dep ? 1 : state.balance}" required>
+      <label class="field-label" for="fundAmount">Amount (${CUR})</label>
+      <input id="fundAmount" class="field-input" type="number" min="${dep ? p.minDeposit : p.minWithdraw}" ${max} step="0.001" value="${dep ? Math.max(p.minDeposit || 0.1, 0.1) : amt(state.balance)}" required>
+      <p class="note">${dep ? `Minimum ${p.minDeposit} ${CUR}. Your wallet shows the exact amount and network fee before you approve.` : `Minimum ${p.minWithdraw} ${CUR}. A ${p.networkFee} ${CUR} network fee is taken from the amount. Up to ${p.maxWithdrawPerDay} ${CUR} per 24 hours.`}</p>
       <p id="fundError" class="err" role="alert"></p>
-      <div class="mact"><button class="btn ghost" type="button" data-action="close">Cancel</button><button class="btn" type="submit">${dep ? `Add demo ${CUR}` : `Withdraw demo ${CUR}`}</button></div>
+      <div id="fundStatus" class="fundstatus" aria-live="polite"></div>
+      <div class="mact"><button class="btn ghost" type="button" data-action="close">Cancel</button><button class="btn" type="submit" id="fundGo">${dep ? `Deposit from wallet` : `Withdraw to wallet`}</button></div>
     </form>`);
 }
+
+const fundStatus = html => { if ($('#fundStatus')) $('#fundStatus').innerHTML = html; };
+async function runDeposit(amount) {
+  const lamports = Math.round(amount * LAMPORTS);
+  let signature;
+  try {
+    signature = await W.deposit({ address: state.me.wallet, treasury: state.pay.treasury, lamports, cluster: state.pay.cluster,
+      onStage: s => fundStatus(`<p><span class="spinner" aria-hidden="true"></span>${s === 'approve' ? 'Approve the transfer in your wallet…' : 'Sending…'}</p>`) });
+  } catch (err) { fundStatus(''); throw err; }
+  const url = `https://solscan.io/tx/${signature}${state.pay.cluster === 'mainnet-beta' ? '' : `?cluster=${state.pay.cluster}`}`;
+  fundStatus(`<p><span class="spinner" aria-hidden="true"></span>Sent. Waiting for Solana to finalize it… ${txLink(url)}</p>`);
+  // The server credits it once finalized; a background scanner also picks it up if this tab closes.
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, i < 5 ? 3000 : 5000));
+    try {
+      const out = await D.reportDeposit(signature);
+      if (out.status === 'credited') { Object.assign(state, { me: out.player, balance: out.player.balance }); return { url }; }
+    } catch { /* keep waiting */ }
+  }
+  throw Object.assign(new Error('Still waiting for the network. Your deposit will be credited automatically once it finalizes.'), { url });
+}
+
 function takeModal(id) {
   const b = state.bets.find(x => x.id === id);
   if (!b || b.state !== 'open' || b.ownerIsMe) return;
+  if (!state.me) return connectModal(() => takeModal(id));
   const t = tokenView(b.token), short = state.balance < b.stake;
   openModal('Take the other side', `<div class="take-head">${art.token(t)}<div><b>${esc(t.symbol)}</b><span>now ${money(t.cap)} · ends in ${timeLeft(b.expiresAt - Date.now())}</span></div></div>
     <p>You win if ${esc(t.symbol)} finishes <b>${b.dir === 'above' ? 'at or below' : 'at or above'} ${money(b.target)}</b> when the bet ends.</p>
     <div class="summary"><div><span>Your stake</span><b>${coins(b.stake)}</b></div><div><span>Their stake</span><b>${coins(b.stake)}</b></div><div class="hl"><span>Prize pool</span><b>${coins(b.stake * 2)}</b></div></div>
-    <p class="${short ? 'err' : 'note'}">${short ? `Deposit demo ${CUR} first to cover this stake.` : `You're betting against ${esc(b.owner)}, a real player. Settles automatically with the real market cap. Stakes are demo ${CUR}.`}</p>
+    <p class="${short ? 'err' : 'note'}">${short ? `Deposit ${CUR} first to cover this stake.` : `You're betting against ${esc(b.owner)}, a real wallet. Settles automatically with the real market cap, and the winner is paid in ${CUR}.${feePct() ? ` cubet keeps ${feePct()}% of the pot.` : ''}`}</p>
     <div class="mact"><button class="btn ghost" type="button" data-action="close">Cancel</button>${short ? `<button class="btn" type="button" data-action="deposit">Deposit</button>` : `<button class="btn" type="button" data-action="take-confirm" data-id="${esc(id)}">Confirm bet</button>`}</div>`, 'wide');
 }
 
@@ -437,7 +512,7 @@ function stepBet() {
         <div class="bx"><label for="target">Target market cap</label><div class="bigin"><span class="u">$</span><input id="target" type="number" min="1" step="any" value="${Math.round(target)}" required></div><span class="hint" id="targetHint"></span></div>
         <div class="bx"><label for="stake">Your stake</label><div class="bigin"><input id="stake" type="number" min="${cfg.minStake}" max="${cfg.maxStake}" step="0.01" value="${d.stake || cfg.defaultStake}" required><span class="u">${CUR}</span></div></div>
         <div class="bx"><label for="duration">Time to target</label><div class="selwrap"><select class="sel full" id="duration">${cfg.durations.map(x => `<option ${d.duration === x.label ? 'selected' : ''}>${x.label}</option>`).join('')}</select>${chevron}</div></div>
-        <div class="bx"><span class="lbl">Available demo balance</span><div class="bigin" id="balBox">${amt(state.balance)} <span class="u">${CUR}</span></div></div>
+        <div class="bx"><span class="lbl">Available balance</span><div class="bigin" id="balBox">${state.me ? `${amt(state.balance)} <span class="u">${CUR}</span>` : '<button class="btn sm" type="button" data-action="wallet">Connect wallet</button>'}</div></div>
       </div>
       <p class="whint err" id="betError" role="alert"></p>
       <div class="wnav"><button type="button" class="btn lg ghost" data-action="wstep" data-step="1">← Back</button><button class="btn lg" type="submit">Next →</button></div>
@@ -464,8 +539,9 @@ function stepConfirm() {
       <div><span>Ends</span><span>in ${esc(d.duration)}</span></div>
       <div><span>Your stake</span><span>${coins(d.stake)}</span></div>
       <div class="hl"><span>Prize pool</span><span>${coins(d.stake * 2)}</span></div>
+      ${feePct() ? `<div><span>If you win</span><span>${coins(d.stake * 2 * (1 - feePct() / 100))} after the ${feePct()}% fee</span></div>` : ''}
     </div>
-    <p class="whint">Settles automatically with the real market cap at expiry · demo ${CUR}</p>
+    <p class="whint">Settles automatically with the real market cap at expiry · real ${CUR}</p>
     <div class="wnav"><button class="btn lg ghost" type="button" data-action="wstep" data-step="2">← Back</button><button class="btn lg" type="button" data-action="create">Create bet →</button></div>
   </div>`;
 }
@@ -544,6 +620,33 @@ const actions = {
   wallet: () => walletModal(),
   deposit: () => fundsModal('deposit'),
   withdraw: () => fundsModal('withdraw'),
+  'connect-wallet': async el => {
+    if (ui.busy) return;
+    ui.busy = true;
+    el.disabled = true;
+    $('#connectError').textContent = '';
+    try {
+      const player = await W.signIn(el.dataset.name);
+      Object.assign(state, { me: player, balance: player.balance });
+      const next = ui.afterConnect;
+      closeModal();
+      toast(`Connected ${shortW(player.wallet)}.`);
+      ui.busy = false;
+      await loadBook({ quiet: true });
+      renderList();
+      if (ui.step === 2) wizard(2);
+      next?.();
+    } catch (err) {
+      if ($('#connectError')) $('#connectError').textContent = err.message;
+      el.disabled = false;
+    } finally { ui.busy = false; }
+  },
+  disconnect: async () => {
+    try { await W.disconnect(); } catch { /* the cookie is cleared server-side anyway */ }
+    Object.assign(state, { me: null, balance: 0 });
+    closeModal(); renderList(); toast('Disconnected.');
+    loadBook({ quiet: true });
+  },
 
   copy: async el => {
     try { await navigator.clipboard.writeText(el.dataset.copy); toast('Contract address copied.'); }
@@ -585,7 +688,8 @@ const actions = {
   },
   create: () => {
     const d = ui.draft;
-    if (state.balance < d.stake) return toast(`Deposit enough demo ${CUR} before creating this bet.`);
+    if (!state.me) return connectModal();
+    if (state.balance < d.stake) return fundsModal('deposit');
     act(() => D.createBet({ mint: d.token.ca, dir: d.dir, target: d.target, duration: d.duration, stake: d.stake }), () => {
       $('#coinFilter').value = '';
       ui.tab = 'mine'; ui.draft = {};
@@ -596,7 +700,7 @@ const actions = {
     });
   },
 
-  take: el => takeModal(el.dataset.id),
+  take: el => withWallet(() => takeModal(el.dataset.id)),
   'take-confirm': el => {
     const b = findBet(el.dataset.id);
     if (!b || b.state !== 'open' || b.ownerIsMe) return;
@@ -631,16 +735,35 @@ document.addEventListener('change', e => {
 document.addEventListener('submit', async e => {
   e.preventDefault();
   if (e.target.id === 'fundForm') {
-    const amount = Number($('#fundAmount').value), dep = e.target.dataset.mode === 'deposit';
-    if (!Number.isFinite(amount) || amount <= 0 || amount > cfg.maxDeposit || (!dep && amount > state.balance)) {
-      $('#fundError').textContent = dep ? `Enter an amount between 0.0001 and ${cfg.maxDeposit} ${CUR}.` : 'Enter an amount within your available demo balance.';
+    if (ui.busy) return;
+    const amount = Number($('#fundAmount').value), dep = e.target.dataset.mode === 'deposit', p = state.pay;
+    const min = dep ? p.minDeposit : p.minWithdraw;
+    if (!Number.isFinite(amount) || amount < min || (!dep && amount > state.balance)) {
+      $('#fundError').textContent = dep ? `Enter at least ${min} ${CUR}.` : `Enter between ${min} and ${amt(state.balance)} ${CUR}.`;
       return;
     }
-    act(() => D.funds(dep ? 'deposit' : 'withdraw', amount), () => {
-      closeModal();
-      if ($('#balBox')) $('#balBox').innerHTML = `${amt(state.balance)} <span class="u">${CUR}</span>`;
-      toast(dep ? `Demo ${CUR} added.` : `Demo ${CUR} withdrawn.`);
-    });
+    $('#fundError').textContent = '';
+    $('#fundGo').disabled = true;
+    ui.busy = true;
+    try {
+      if (dep) {
+        await runDeposit(amount);
+        fundStatus(`<p class="ok">${check} Deposit credited. Balance: <b>${coins(state.balance)}</b></p>`);
+        toast(`Deposit credited: ${coins(amount)}.`);
+      } else {
+        const out = await D.withdraw(amount);
+        Object.assign(state, { me: out.player, balance: out.player.balance });
+        fundStatus(`<p class="ok">${check} Sent ${coins(out.amount)} to your wallet. ${txLink(out.url)}</p>`);
+        toast(`Withdrawal sent: ${coins(out.amount)}.`);
+      }
+      $('#fundGo').hidden = true;
+      $('[data-action="close"]', e.target).textContent = 'Done';
+      renderBalance();
+      loadBook({ quiet: true });
+    } catch (err) {
+      $('#fundError').innerHTML = `${esc(err.message)}${err.url ? ` ${txLink(err.url)}` : ''}`;
+      $('#fundGo').disabled = false;
+    } finally { ui.busy = false; }
   }
   if (e.target.id === 'betForm') {
     const d = ui.draft, target = Number($('#target').value), stake = Number($('#stake').value), err = $('#betError');
@@ -652,7 +775,7 @@ document.addEventListener('submit', async e => {
       err.textContent = `Choose a target ${d.dir} the current market cap (${money(cap)}).`; return;
     }
     if (!Number.isFinite(stake) || stake < cfg.minStake || stake > cfg.maxStake) { err.textContent = `Stakes are ${cfg.minStake} to ${cfg.maxStake} ${CUR}.`; return; }
-    if (stake > state.balance) { err.textContent = `Deposit enough demo ${CUR} to cover your stake.`; return; }
+    if (state.me && stake > state.balance) { err.innerHTML = `Deposit enough ${CUR} to cover your stake. <button class="linkbtn" type="button" data-action="deposit">Deposit</button>`; return; }
     Object.assign(d, { target, stake, duration: $('#duration').value });
     wizard(3);
   }
@@ -720,7 +843,9 @@ applyTheme();
 renderList();
 wizard(1);
 openFromUrl();
+W.onChange(() => { if ($('.wlist') && !state.me) connectModal(ui.afterConnect); });
 (async () => {
+  try { state.pay = await D.payConfig(); } catch { state.pay = null; }
   await loadBook({ quiet: true });
   ui.loading = false;
   renderList();

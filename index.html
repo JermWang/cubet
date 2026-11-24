@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="cubet is a market-cap betting terminal for any Solana token, built on live on-chain and market data. Stakes are demo SOL for now.">
+<meta name="description" content="cubet is a market-cap betting terminal for any Solana token. Connect a wallet, stake real SOL against another player, and the bet settles on the real market cap.">
 <title>cubet — stack your call</title>
 <!--server-meta-->
 <link rel="icon" href="/favicon.svg">
@@ -76,7 +76,7 @@
           <svg class="ca-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5"/><path d="M15.5 8.5V6.5A2.5 2.5 0 0 0 13 4H6.5A2.5 2.5 0 0 0 4 6.5V13a2.5 2.5 0 0 0 2.5 2.5h2"/></svg>
           <span class="sr" id="caStatus" aria-live="polite"></span>
         </button>
-        <p class="splash-note"><span class="live-dot" aria-hidden="true"></span>Live Solana market data · real players · demo SOL stakes for now · <a href="/proof">Proof</a></p>
+        <p class="splash-note"><span class="live-dot" aria-hidden="true"></span>Live Solana market data · real wallets · real SOL stakes · <a href="/proof">Proof</a></p>
       </div>
       <div class="splash-stage" aria-hidden="true">
         <div class="splash-cube" id="splashCube"></div>
@@ -192,7 +192,7 @@
       </details>
       <details>
         <summary>Is this real money?</summary>
-        <p>Not yet. Stakes are demo SOL, and every new player starts with 1 demo SOL. Every other player is a real visitor, and bets, balances and settlements are kept in cubet's shared bet book on our server. No wallet connects and nothing is sent on-chain, so there are no transactions to show yet. The <a href="/proof">Proof page</a> lists every settlement with the market data it used.</p>
+        <p>Yes. Connect a Solana wallet (Phantom, Solflare, Backpack), deposit SOL, and bet against other players. Winnings go to your cubet balance, and you can withdraw to your own wallet at any time. cubet is custodial: deposited SOL sits in cubet's treasury wallet while you play, not in an on-chain escrow program. The <a href="/proof">Proof page</a> shows the treasury's live balance next to everything cubet owes, and every deposit and withdrawal with its Solana transaction.</p>
       </details>
       <details>
         <summary>How does a bet work?</summary>
@@ -200,15 +200,15 @@
       </details>
       <details>
         <summary>Which coins can I bet on?</summary>
-        <p>Any Solana token with a trading pair. Paste its contract address, or pick one from the live markets.</p>
+        <p>Any Solana token with a real market: its top trading pool needs at least $20,000 of liquidity, so a thin pool can't be pushed around at the last minute. Paste its contract address, or pick one from the live markets.</p>
       </details>
       <details>
         <summary>How is a bet settled?</summary>
-        <p>When a bet ends, our server reads the token's market cap at that exact minute from its GeckoTerminal price candle (the live DexScreener cap if it ended in the last two minutes) and pays the winner the whole pot. Each settlement on the Proof page links the pool and candle so you can check it. If no market data exists for the expiry, the bet is void and both stakes are refunded.</p>
+        <p>When a bet ends, our server reads the token's market cap at that exact minute from its GeckoTerminal price candle (the live DexScreener cap if it ended in the last two minutes) and pays the winner the pot (minus cubet's fee, if one is set; the rate is shown before you confirm). Each settlement on the Proof page links the pool and candle so you can check it. If no market data exists for the expiry, the bet is void and both stakes are refunded.</p>
       </details>
       <details>
         <summary>Who can see my bets?</summary>
-        <p>Everyone sees open bets, bets in play and settlements, under an anonymous handle like 4xRw…LhgK. No account, email or wallet is needed. Your session is a cookie in this browser.</p>
+        <p>Everyone sees open bets, bets in play and settlements, under your wallet's short address, like 4xRw…LhgK. You sign in by signing a one-time message with your wallet: no email or password, and signing costs nothing.</p>
       </details>
     </div>
   </section>

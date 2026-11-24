@@ -1,21 +1,25 @@
-// cubet bet book: every bet, every player and every balance lives here, on the server.
-//   Players    anonymous visitors, identified by an HttpOnly session cookie (only its SHA-256 is stored)
+// cubet bet book: every player, bet and balance lives here, on the server. Stakes are real SOL.
+//   Players    Solana wallets. A player signs in by signing a one-time message with their wallet;
+//              the server verifies the ed25519 signature and issues an HttpOnly session cookie.
+//   Funds      Deposits are real SOL transfers to cubet's treasury wallet, credited once the transaction
+//              is finalized on-chain (see payments.mjs). Withdrawals are real SOL transfers from the
+//              treasury to the player's own wallet. Balances are kept in lamports.
 //   Bets       created, taken, cancelled and settled here; nothing is simulated
 //   Settlement a loop settles expired bets on the token's real market cap at the exact expiry time
 //              (market.capAt: the GeckoTerminal candle that contains the expiry, converted to market cap)
-//   Ledger     every balance change is written with its reason, so any balance can be audited
-// Stakes are demo SOL: balances are numbers in this database, not on-chain funds.
+//   Ledger     every balance change is written with its reason and reference (bet id or tx signature)
 // Storage: SQLite through Node's built-in node:sqlite (no dependencies). DB_PATH points at a persistent volume.
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const UNIT = 10_000;                         // balances are stored as integers of 0.0001 SOL
-const toU = sol => Math.round(Number(sol) * UNIT);
-const fromU = u => Number((u / UNIT).toFixed(4));
-const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+export const LAMPORTS = 1_000_000_000;
+const toL = sol => Math.round(Number(sol) * LAMPORTS);
+export const fromL = l => Number((l / LAMPORTS).toFixed(9));
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+export const HOUSE = 'house';                 // ledger account for cubet's fee on settled pots
+const SESSION_DAYS = 30;
 
 export const DURATIONS = [
   { label: '15 min', ms: 15 * 60e3 },
@@ -31,110 +35,123 @@ export class BookError extends Error {
 }
 const fail = (status, code, message) => { throw new BookError(status, code, message); };
 
-export function createBook({ dbPath, market, startingBalance = 1, maxDeposit = 1000, minStake = 0.01, maxStake = 100, maxOpenPerPlayer = 20, log = console }) {
+export function createBook({ dbPath, market, minStake = 0.01, maxStake = 10, maxOpenPerPlayer = 20, feeBps = 0, minLiquidityUsd = 20000, log = console }) {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
+  db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 3000;');
+
+  // The first version of cubet kept demo balances in these tables. They are moved aside (never mixed with
+  // real funds) the first time this version starts.
+  const cols = db.prepare("SELECT name FROM pragma_table_info('players')").all().map(r => r.name);
+  if (cols.length && !cols.includes('wallet')) {
+    db.exec(`ALTER TABLE players RENAME TO demo_players; ALTER TABLE bets RENAME TO demo_bets; ALTER TABLE ledger RENAME TO demo_ledger;
+             DROP INDEX IF EXISTS bets_state;`);
+    log.log?.('book: moved the old demo tables aside (demo_players, demo_bets, demo_ledger)');
+  }
+
   db.exec(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA busy_timeout = 3000;
     CREATE TABLE IF NOT EXISTS players (
-      id TEXT PRIMARY KEY, session_hash TEXT UNIQUE NOT NULL, handle TEXT NOT NULL,
-      balance_u INTEGER NOT NULL DEFAULT 0, deposit_day TEXT, deposited_u INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL);
+      id TEXT PRIMARY KEY, wallet TEXT UNIQUE NOT NULL, handle TEXT NOT NULL,
+      balance_l INTEGER NOT NULL DEFAULT 0 CHECK (balance_l >= 0), created_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS sessions (
+      hash TEXT PRIMARY KEY, player TEXT NOT NULL REFERENCES players(id), created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS bets (
       id TEXT PRIMARY KEY, mint TEXT NOT NULL, symbol TEXT, name TEXT, image TEXT,
       dir TEXT NOT NULL CHECK (dir IN ('above','below')), target REAL NOT NULL, from_cap REAL NOT NULL,
-      stake_u INTEGER NOT NULL, duration TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+      stake_l INTEGER NOT NULL CHECK (stake_l > 0), duration TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
       owner TEXT NOT NULL REFERENCES players(id), taker TEXT REFERENCES players(id), taken_at INTEGER,
       state TEXT NOT NULL CHECK (state IN ('open','active','settled','expired','cancelled','void')),
       settled_cap REAL, settle_source TEXT, settle_candle INTEGER, settle_pair TEXT, creator_won INTEGER,
-      settled_at INTEGER, settle_attempts INTEGER NOT NULL DEFAULT 0);
+      fee_l INTEGER NOT NULL DEFAULT 0, settled_at INTEGER, settle_attempts INTEGER NOT NULL DEFAULT 0);
     CREATE INDEX IF NOT EXISTS bets_state ON bets(state, expires_at);
     CREATE TABLE IF NOT EXISTS ledger (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, player TEXT NOT NULL, delta_u INTEGER NOT NULL,
-      reason TEXT NOT NULL, bet_id TEXT, at INTEGER NOT NULL);
+      id INTEGER PRIMARY KEY AUTOINCREMENT, player TEXT NOT NULL, delta_l INTEGER NOT NULL,
+      reason TEXT NOT NULL, ref TEXT, at INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS ledger_player ON ledger(player, id);
   `);
 
   const q = {
-    playerBySession: db.prepare('SELECT * FROM players WHERE session_hash = ?'),
+    playerBySession: db.prepare('SELECT p.* FROM sessions s JOIN players p ON p.id = s.player WHERE s.hash = ? AND s.expires_at > ?'),
     playerById: db.prepare('SELECT * FROM players WHERE id = ?'),
-    insertPlayer: db.prepare('INSERT INTO players (id, session_hash, handle, created_at) VALUES (?, ?, ?, ?)'),
-    addBalance: db.prepare('UPDATE players SET balance_u = balance_u + ? WHERE id = ?'),
-    setDeposit: db.prepare('UPDATE players SET deposit_day = ?, deposited_u = ? WHERE id = ?'),
-    ledger: db.prepare('INSERT INTO ledger (player, delta_u, reason, bet_id, at) VALUES (?, ?, ?, ?, ?)'),
+    playerByWallet: db.prepare('SELECT * FROM players WHERE wallet = ?'),
+    insertPlayer: db.prepare('INSERT INTO players (id, wallet, handle, created_at) VALUES (?, ?, ?, ?)'),
+    insertSession: db.prepare('INSERT INTO sessions (hash, player, created_at, expires_at) VALUES (?, ?, ?, ?)'),
+    deleteSession: db.prepare('DELETE FROM sessions WHERE hash = ?'),
+    pruneSessions: db.prepare('DELETE FROM sessions WHERE expires_at < ?'),
+    addBalance: db.prepare('UPDATE players SET balance_l = balance_l + ? WHERE id = ?'),
+    ledger: db.prepare('INSERT INTO ledger (player, delta_l, reason, ref, at) VALUES (?, ?, ?, ?, ?)'),
+    houseBalance: db.prepare('SELECT COALESCE(SUM(delta_l), 0) n FROM ledger WHERE player = ?'),
+    history: db.prepare('SELECT delta_l, reason, ref, at FROM ledger WHERE player = ? ORDER BY id DESC LIMIT ?'),
     bet: db.prepare('SELECT * FROM bets WHERE id = ?'),
     openCount: db.prepare("SELECT COUNT(*) n FROM bets WHERE owner = ? AND state = 'open'"),
-    insertBet: db.prepare(`INSERT INTO bets (id, mint, symbol, name, image, dir, target, from_cap, stake_u, duration, created_at, expires_at, owner, state)
+    insertBet: db.prepare(`INSERT INTO bets (id, mint, symbol, name, image, dir, target, from_cap, stake_l, duration, created_at, expires_at, owner, state)
                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`),
     take: db.prepare("UPDATE bets SET taker = ?, taken_at = ?, state = 'active' WHERE id = ? AND state = 'open'"),
     setState: db.prepare('UPDATE bets SET state = ? WHERE id = ? AND state = ?'),
     settle: db.prepare(`UPDATE bets SET state = 'settled', settled_cap = ?, settle_source = ?, settle_candle = ?, settle_pair = ?,
-                        creator_won = ?, settled_at = ? WHERE id = ? AND state = 'active'`),
+                        creator_won = ?, fee_l = ?, settled_at = ? WHERE id = ? AND state = 'active'`),
     voided: db.prepare('UPDATE bets SET settled_at = ? WHERE id = ?'),
     attempt: db.prepare('UPDATE bets SET settle_attempts = settle_attempts + 1 WHERE id = ?'),
     due: db.prepare("SELECT * FROM bets WHERE state IN ('open','active') AND expires_at <= ? ORDER BY expires_at LIMIT 50"),
     live: db.prepare("SELECT * FROM bets WHERE state IN ('open','active') ORDER BY expires_at"),
     recent: db.prepare("SELECT * FROM bets WHERE state IN ('settled','void') ORDER BY settled_at DESC LIMIT ?"),
-    mineDone: db.prepare("SELECT * FROM bets WHERE (owner = ? OR taker = ?) AND state IN ('settled','expired','void') ORDER BY expires_at DESC LIMIT 50"),
+    mineDone: db.prepare("SELECT * FROM bets WHERE (owner = ? OR taker = ?) AND state IN ('settled','expired','void','cancelled') ORDER BY expires_at DESC LIMIT 50"),
     handles: db.prepare('SELECT id, handle FROM players WHERE id IN (SELECT value FROM json_each(?))'),
     counts: db.prepare(`SELECT
         (SELECT COUNT(*) FROM bets) bets,
         (SELECT COUNT(*) FROM bets WHERE state = 'settled') settled,
-        (SELECT COUNT(DISTINCT p) FROM (SELECT owner p FROM bets UNION SELECT taker FROM bets WHERE taker IS NOT NULL)) players`),
-    settledAll: db.prepare("SELECT owner, taker, stake_u, creator_won FROM bets WHERE state = 'settled'"),
-    activeAll: db.prepare("SELECT owner, taker, stake_u FROM bets WHERE state IN ('open','active')"),
+        (SELECT COUNT(*) FROM players) players`),
+    settledAll: db.prepare("SELECT owner, taker, stake_l, fee_l, creator_won FROM bets WHERE state = 'settled'"),
+    activeAll: db.prepare("SELECT owner, taker, stake_l FROM bets WHERE state IN ('open','active')"),
+    liabilities: db.prepare(`SELECT
+        (SELECT COALESCE(SUM(balance_l), 0) FROM players) balances,
+        (SELECT COALESCE(SUM(stake_l), 0) FROM bets WHERE state = 'open') open_stakes,
+        (SELECT COALESCE(SUM(stake_l * 2), 0) FROM bets WHERE state = 'active') active_pots`),
   };
 
-  // Every multi-step change runs in one transaction, so a crash never leaves a stake half-moved.
+  // Every multi-step change runs in one transaction, so a crash never leaves funds half-moved.
+  let depth = 0;
   function tx(fn) {
-    db.exec('BEGIN IMMEDIATE');
-    try { const out = fn(); db.exec('COMMIT'); return out; }
-    catch (err) { db.exec('ROLLBACK'); throw err; }
+    if (depth) return fn();                       // already inside a transaction (payments call in)
+    db.exec('BEGIN IMMEDIATE'); depth++;
+    try { const out = fn(); depth--; db.exec('COMMIT'); return out; }
+    catch (err) { depth--; db.exec('ROLLBACK'); throw err; }
   }
-  function move(player, deltaU, reason, betId = null) {
-    q.addBalance.run(deltaU, player);
-    q.ledger.run(player, deltaU, reason, betId, Date.now());
+  function move(player, deltaL, reason, ref = null) {
+    if (player !== HOUSE) {
+      const cur = q.playerById.get(player);
+      if (!cur) fail(500, 'no_player', 'Unknown player.');
+      if (cur.balance_l + deltaL < 0) fail(400, 'insufficient', 'That is more than your available balance.');
+      q.addBalance.run(deltaL, player);
+    }
+    q.ledger.run(player, deltaL, reason, ref, Date.now());
   }
 
-  /* ---------- players ---------- */
+  /* ---------- players and sessions ---------- */
   const hash = s => createHash('sha256').update(s).digest('hex');
-  const handleFor = () => { const r = randomBytes(8); const s = [...r].map(b => B58[b % 58]).join(''); return `${s.slice(0, 4)}…${s.slice(4)}`; };
+  const handleOf = wallet => `${wallet.slice(0, 4)}…${wallet.slice(-4)}`;
 
   /** The player behind a session cookie, or null. */
   function player(session) {
     if (!session || session.length < 20 || session.length > 100) return null;
-    return q.playerBySession.get(hash(session)) || null;
+    return q.playerBySession.get(hash(session), Date.now()) || null;
   }
-  /** Create a new anonymous player, credit the starting demo balance, and return [session, player]. */
-  function newPlayer() {
+  /** Find or create the player for a verified wallet and open a new session. Returns [session, player, isNew]. */
+  function signIn(wallet) {
     const session = randomBytes(32).toString('base64url');
-    const id = randomUUID();
-    tx(() => {
-      q.insertPlayer.run(id, hash(session), handleFor(), Date.now());
-      if (startingBalance > 0) move(id, toU(startingBalance), 'starting demo balance');
-    });
-    return [session, q.playerById.get(id)];
-  }
-  const me = p => ({ id: p.id, handle: p.handle, balance: fromU(p.balance_u) });
-
-  function funds(p, mode, amount) {
-    const u = toU(amount);
-    if (!Number.isFinite(u) || u <= 0) fail(400, 'bad_amount', 'Enter an amount above zero.');
     return tx(() => {
-      const cur = q.playerById.get(p.id);
-      if (mode === 'deposit') {
-        const day = new Date().toISOString().slice(0, 10);
-        const used = cur.deposit_day === day ? cur.deposited_u : 0;
-        if (used + u > toU(maxDeposit)) fail(400, 'deposit_limit', `Demo deposits are limited to ${maxDeposit} SOL a day.`);
-        q.setDeposit.run(day, used + u, p.id);
-        move(p.id, u, 'demo deposit');
-      } else if (mode === 'withdraw') {
-        if (u > cur.balance_u) fail(400, 'insufficient', 'That is more than your available demo balance.');
-        move(p.id, -u, 'demo withdrawal');
-      } else fail(400, 'bad_mode', 'Unknown action.');
-      return me(q.playerById.get(p.id));
+      let p = q.playerByWallet.get(wallet), isNew = false;
+      if (!p) { q.insertPlayer.run(randomUUID(), wallet, handleOf(wallet), Date.now()); p = q.playerByWallet.get(wallet); isNew = true; }
+      const now = Date.now();
+      q.pruneSessions.run(now);
+      q.insertSession.run(hash(session), p.id, now, now + SESSION_DAYS * 86400e3);
+      return [session, p, isNew];
     });
   }
+  const signOut = session => { if (session) q.deleteSession.run(hash(session)); };
+  const me = p => ({ id: p.id, wallet: p.wallet, handle: p.handle, balance: fromL(p.balance_l) });
+  const refresh = p => q.playerById.get(p.id);
+  const history = (p, limit = 50) => q.history.all(p.id, limit).map(r => ({ amount: fromL(r.delta_l), reason: r.reason, ref: r.ref, at: r.at }));
 
   /* ---------- bets ---------- */
   async function create(p, input) {
@@ -145,21 +162,21 @@ export function createBook({ dbPath, market, startingBalance = 1, maxDeposit = 1
     const dur = DURATIONS.find(d => d.label === input?.duration);
     if (!dur) fail(400, 'bad_duration', 'Choose a bet length.');
     const target = Number(input?.target);
-    const stakeU = toU(input?.stake);
-    if (!(stakeU >= toU(minStake) && stakeU <= toU(maxStake))) fail(400, 'bad_stake', `Stakes are ${minStake} to ${maxStake} SOL.`);
+    const stakeL = toL(input?.stake);
+    if (!(stakeL >= toL(minStake) && stakeL <= toL(maxStake))) fail(400, 'bad_stake', `Stakes are ${minStake} to ${maxStake} SOL.`);
     // The token and its market cap come from our own server's live check, never from the browser.
     const tok = await market.token(mint);
     if (!tok.tradable || !(tok.cap > 0)) fail(400, 'no_market', 'This token has no DEX market cap to bet on.');
+    // Thin pools are easy to push around at the last minute, so real-SOL bets need a real pool.
+    if (!(Number(tok.liquidity) >= minLiquidityUsd)) fail(400, 'low_liquidity', `This token's top pool has under $${minLiquidityUsd.toLocaleString('en-US')} of liquidity, so it can't be bet on yet.`);
     if (!Number.isFinite(target) || target <= 0) fail(400, 'bad_target', 'Enter a target market cap.');
     if (dir === 'above' && target <= tok.cap) fail(400, 'bad_target', `For Higher, the target must be above the current market cap (${Math.round(tok.cap)}).`);
     if (dir === 'below' && target >= tok.cap) fail(400, 'bad_target', `For Lower, the target must be below the current market cap (${Math.round(tok.cap)}).`);
     const now = Date.now(), id = randomUUID();
     return tx(() => {
-      const cur = q.playerById.get(p.id);
-      if (cur.balance_u < stakeU) fail(400, 'insufficient', 'Deposit enough demo SOL to cover your stake.');
       if (q.openCount.get(p.id).n >= maxOpenPerPlayer) fail(400, 'too_many', `You can have up to ${maxOpenPerPlayer} open bets at once.`);
-      q.insertBet.run(id, mint, tok.symbol || '', tok.name || '', tok.image || '', dir, target, tok.cap, stakeU, dur.label, now, now + dur.ms, p.id);
-      move(p.id, -stakeU, 'stake: create', id);
+      q.insertBet.run(id, mint, tok.symbol || '', tok.name || '', tok.image || '', dir, target, tok.cap, stakeL, dur.label, now, now + dur.ms, p.id);
+      move(p.id, -stakeL, 'stake: create', id);
       return id;
     });
   }
@@ -174,10 +191,9 @@ export function createBook({ dbPath, market, startingBalance = 1, maxDeposit = 1
       if (!b || b.state !== 'open') fail(409, 'not_open', 'This bet is no longer open.');
       if (b.owner === p.id) fail(400, 'own_bet', 'You cannot take your own bet.');
       if (Date.now() > takeDeadline(b)) fail(409, 'closing', 'Taking is closed: less than a quarter of this bet’s time is left.');
-      const cur = q.playerById.get(p.id);
-      if (cur.balance_u < b.stake_u) fail(400, 'insufficient', 'Deposit enough demo SOL to cover this stake.');
+      if (refresh(p).balance_l < b.stake_l) fail(400, 'insufficient', 'Deposit enough SOL to cover this stake.');
       if (q.take.run(p.id, Date.now(), b.id).changes !== 1) fail(409, 'not_open', 'Someone else just took this bet.');
-      move(p.id, -b.stake_u, 'stake: take', b.id);
+      move(p.id, -b.stake_l, 'stake: take', b.id);
     });
   }
 
@@ -186,12 +202,13 @@ export function createBook({ dbPath, market, startingBalance = 1, maxDeposit = 1
       const b = q.bet.get(String(id));
       if (!b || b.owner !== p.id) fail(404, 'not_found', 'Bet not found.');
       if (q.setState.run('cancelled', b.id, 'open').changes !== 1) fail(409, 'not_open', 'Only open bets can be cancelled.');
-      move(p.id, b.stake_u, 'refund: cancelled', b.id);
+      move(p.id, b.stake_l, 'refund: cancelled', b.id);
     });
   }
 
   /* ---------- settlement ---------- */
   const creatorWins = (b, cap) => (b.dir === 'above' ? cap > b.target : cap < b.target);
+  const feeOf = pot => Math.floor(pot * feeBps / 10_000);
   let running = false;
   async function settleDue() {
     if (running) return;
@@ -200,15 +217,16 @@ export function createBook({ dbPath, market, startingBalance = 1, maxDeposit = 1
       for (const b of q.due.all(Date.now())) {
         if (b.state === 'open') {
           // No one took it before it ended: the creator gets the stake back.
-          tx(() => { if (q.setState.run('expired', b.id, 'open').changes === 1) move(b.owner, b.stake_u, 'refund: no taker', b.id); });
+          tx(() => { if (q.setState.run('expired', b.id, 'open').changes === 1) move(b.owner, b.stake_l, 'refund: no taker', b.id); });
           continue;
         }
         try {
           const r = await market.capAt(b.mint, b.expires_at / 1000);
-          const won = creatorWins(b, r.cap);
+          const won = creatorWins(b, r.cap), pot = b.stake_l * 2, fee = feeOf(pot);
           tx(() => {
-            if (q.settle.run(r.cap, r.source, r.candleTime ?? null, r.pair ?? null, won ? 1 : 0, Date.now(), b.id).changes !== 1) return;
-            move(won ? b.owner : b.taker, b.stake_u * 2, 'payout: won', b.id);
+            if (q.settle.run(r.cap, r.source, r.candleTime ?? null, r.pair ?? null, won ? 1 : 0, fee, Date.now(), b.id).changes !== 1) return;
+            move(won ? b.owner : b.taker, pot - fee, 'payout: won', b.id);
+            if (fee) move(HOUSE, fee, 'fee: settled pot', b.id);
           });
         } catch (err) {
           q.attempt.run(b.id);
@@ -218,8 +236,8 @@ export function createBook({ dbPath, market, startingBalance = 1, maxDeposit = 1
             tx(() => {
               if (q.setState.run('void', b.id, 'active').changes !== 1) return;
               q.voided.run(Date.now(), b.id);
-              move(b.owner, b.stake_u, 'refund: void (no market data at expiry)', b.id);
-              move(b.taker, b.stake_u, 'refund: void (no market data at expiry)', b.id);
+              move(b.owner, b.stake_l, 'refund: void (no market data at expiry)', b.id);
+              move(b.taker, b.stake_l, 'refund: void (no market data at expiry)', b.id);
             });
           }
           log.warn?.(`settle ${b.id} failed: ${err.message}`);
@@ -237,7 +255,7 @@ export function createBook({ dbPath, market, startingBalance = 1, maxDeposit = 1
     const mine = viewer && (b.owner === viewer || b.taker === viewer);
     return {
       id: b.id, token: { ca: b.mint, symbol: b.symbol, name: b.name, image: b.image },
-      dir: b.dir, target: b.target, from: b.from_cap, stake: fromU(b.stake_u), duration: b.duration,
+      dir: b.dir, target: b.target, from: b.from_cap, stake: fromL(b.stake_l), fee: fromL(b.fee_l), duration: b.duration,
       createdAt: b.created_at, expiresAt: b.expires_at, takeUntil: b.state === 'open' ? takeDeadline(b) : null,
       state: b.state, owner: names.get(b.owner) || '—', taker: b.taker ? names.get(b.taker) || '—' : null,
       ownerIsMe: viewer === b.owner, takerIsMe: Boolean(viewer && viewer === b.taker), mine: Boolean(mine),
@@ -251,7 +269,7 @@ export function createBook({ dbPath, market, startingBalance = 1, maxDeposit = 1
     const open = live.filter(b => b.state === 'open');
     const c = q.counts.get();
     return {
-      open: open.length, openPot: fromU(open.reduce((s, b) => s + b.stake_u * 2, 0)),
+      open: open.length, openPot: fromL(open.reduce((s, b) => s + b.stake_l * 2, 0)),
       inPlay: live.length - open.length, players: c.players, totalBets: c.bets, settled: c.settled,
     };
   }
@@ -269,18 +287,28 @@ export function createBook({ dbPath, market, startingBalance = 1, maxDeposit = 1
   }
   function leaderboard(viewer) {
     const map = new Map();
-    const get = id => { if (!map.has(id)) map.set(id, { id, w: 0, l: 0, inPlayU: 0, plU: 0 }); return map.get(id); };
+    const get = id => { if (!map.has(id)) map.set(id, { id, w: 0, l: 0, inPlayL: 0, plL: 0 }); return map.get(id); };
     for (const b of q.settledAll.all()) {
       const win = get(b.creator_won ? b.owner : b.taker), lose = get(b.creator_won ? b.taker : b.owner);
-      win.w++; win.plU += b.stake_u; lose.l++; lose.plU -= b.stake_u;
+      win.w++; win.plL += b.stake_l - b.fee_l; lose.l++; lose.plL -= b.stake_l;
     }
-    for (const b of q.activeAll.all()) { get(b.owner).inPlayU += b.stake_u; if (b.taker) get(b.taker).inPlayU += b.stake_u; }
+    for (const b of q.activeAll.all()) { get(b.owner).inPlayL += b.stake_l; if (b.taker) get(b.taker).inPlayL += b.stake_l; }
     const names = new Map(map.size ? q.handles.all(JSON.stringify([...map.keys()])).map(r => [r.id, r.handle]) : []);
     return [...map.values()]
-      .sort((a, b) => b.plU - a.plU || b.w - a.w || b.inPlayU - a.inPlayU)
+      .sort((a, b) => b.plL - a.plL || b.w - a.w || b.inPlayL - a.inPlayL)
       .slice(0, 100)
-      .map(r => ({ name: names.get(r.id) || '—', me: r.id === viewer, w: r.w, l: r.l, inPlay: fromU(r.inPlayU), pl: fromU(r.plU) }));
+      .map(r => ({ name: names.get(r.id) || '—', me: r.id === viewer, w: r.w, l: r.l, inPlay: fromL(r.inPlayL), pl: fromL(r.plL) }));
+  }
+  /** What cubet owes, in lamports: player balances, stakes locked in bets, and unswept house fees. */
+  function liabilities() {
+    const r = q.liabilities.get();
+    const house = q.houseBalance.get(HOUSE).n;
+    return { balances: r.balances, lockedInBets: r.open_stakes + r.active_pots, houseFees: house, total: r.balances + r.open_stakes + r.active_pots + house };
   }
 
-  return { player, newPlayer, me, funds, create, take, cancel, settleDue, snapshot, settlements, leaderboard, stats, DURATIONS };
+  return {
+    db, tx, move, fail, player, signIn, signOut, me, refresh, history, create, take, cancel, settleDue,
+    snapshot, settlements, leaderboard, stats, liabilities, houseBalance: () => q.houseBalance.get(HOUSE).n,
+    playerByWallet: w => q.playerByWallet.get(w) || null, DURATIONS, minStake, maxStake, feeBps, minLiquidityUsd,
+  };
 }

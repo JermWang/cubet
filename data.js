@@ -57,14 +57,20 @@ window.CubetData = {
   /** Market cap at a past moment (used to settle bets at their exact expiry). */
   capAt: (mint, unix) => cachedFetch(`/api/cap-at/${enc(mint)}?t=${Math.floor(unix)}`, 60e3),
 
-  /* Shared bet book (book.mjs on the server). Every player is a real visitor. */
-  /** This browser's player, creating an anonymous one on first visit: { id, handle, balance } */
-  session: async () => (await call('/api/me')).player || (await call('/api/session', {})).player,
+  /* Shared bet book (book.mjs on the server). Every player is a signed-in Solana wallet. */
+  /** The signed-in player, or null: { id, wallet, handle, balance } */
+  session: async () => (await call('/api/me')).player,
   book: () => call('/api/book'),
   leaderboard: async () => (await call('/api/leaderboard')).players,
   settlements: async (limit = 25) => (await call(`/api/settlements?limit=${limit}`)).bets,
   stats: () => call('/api/stats'),
-  funds: (mode, amount) => call('/api/funds', { mode, amount }),
+  /** Payments: treasury config, the player's transfers, deposits and withdrawals (payments.mjs). */
+  payConfig: () => call('/api/pay/config'),
+  payStatus: () => call('/api/pay/status'),
+  transfers: (limit = 25) => call(`/api/pay/transfers?limit=${limit}`),
+  myTransfers: () => call('/api/pay/mine'),
+  reportDeposit: signature => call('/api/pay/deposit', { signature }),
+  withdraw: amount => call('/api/pay/withdraw', { amount }),
   createBet: bet => call('/api/bets', bet),
   takeBet: id => call(`/api/bets/${enc(id)}/take`, {}),
   cancelBet: id => call(`/api/bets/${enc(id)}/cancel`, {}),
@@ -72,6 +78,7 @@ window.CubetData = {
   money: n => (Number.isFinite(n) ? '$' + fmt.format(n) : '—'),
   pct: n => (Number.isFinite(n) ? `${n > 0 ? '+' : ''}${n.toFixed(Math.abs(n) < 10 ? 1 : 0)}%` : ''),
   explorer: mint => `https://solscan.io/token/${enc(mint)}`,
+  account: (address, cluster = 'mainnet-beta') => `https://solscan.io/account/${enc(address)}${cluster === 'mainnet-beta' ? '' : `?cluster=${enc(cluster)}`}`,
   dexscreener: mint => `https://dexscreener.com/solana/${enc(mint)}`,
 };
 })();

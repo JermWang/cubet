@@ -248,7 +248,7 @@ async function stats(coins) {
   } catch { /* the cell still reads fine without the chart */ }
 }
 
-// Top three real players from the shared leaderboard, ranked by demo P/L (then bets in play).
+// Top three real players from the shared leaderboard, ranked by SOL P/L (then bets in play).
 async function ranks() {
   let list = [];
   try { list = (await D.leaderboard()).slice(0, 3); } catch { /* shown as empty below */ }
