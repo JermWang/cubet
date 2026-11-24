@@ -3,7 +3,7 @@
 A market-cap betting terminal for any Solana token. Token data is live and checked on-chain, every other player is a real visitor, and the server settles each bet on the real market cap at its expiry. Stakes are demo SOL for now.
 
 - **Live:** https://www.cubetsolana.xyz (also https://cubet-production.up.railway.app)
-- **X:** https://x.com/cubetsol
+- **X:** https://x.com/cubetsol_
 - **`/`**: landing page. Every call to action leads to the terminal.
 - **`/terminal`**: the betting terminal: open bets, My Bets, settled bets, create a bet, leaderboard, demo wallet.
 - **`/proof`**: live checks against the real integrations, every settlement with the price candle it used, and the limits below.

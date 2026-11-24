@@ -16,6 +16,12 @@ $$('[data-footer]').forEach(el => { el.textContent = cfg.brand.footer; });
 $('[data-mint-short]').textContent = `"${MINT.slice(0, 6)}…${MINT.slice(-4)}"`;
 $('[data-solscan]').href = D.explorer(MINT);
 
+// The official token, from the same TOKEN_CA setting as the splash page's copy button.
+const TOKEN_CA = String(cfg.token?.ca || '').trim();
+if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(TOKEN_CA)) {
+  $('#pfToken').innerHTML = `<b>The cubet token isn't used in betting yet.</b> The official token is <a href="${esc(D.explorer(TOKEN_CA))}" target="_blank" rel="noopener noreferrer"><code>${esc(TOKEN_CA)}</code></a>. Stakes are still demo SOL. Any other token claiming to be cubet's is not ours; the address is also posted on <a href="https://x.com/cubetsol_" target="_blank" rel="noopener noreferrer">@cubetsol_</a>.`;
+}
+
 // Raw fetch so the page shows exactly what the server returned, status and timing included.
 async function raw(url) {
   const t0 = performance.now();

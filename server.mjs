@@ -111,7 +111,7 @@ function renderPage(html, rel) {
     `<meta property="og:title" content="${escAttr(title)}">`,
     `<meta property="og:description" content="${escAttr(desc)}">`,
     `<meta name="twitter:card" content="${HAS_OG ? 'summary_large_image' : 'summary'}">`,
-    `<meta name="twitter:site" content="@cubetsol">`,
+    `<meta name="twitter:site" content="@cubetsol_">`,
     `<meta name="theme-color" content="#000000">`,
     ...(url ? [`<meta property="og:url" content="${escAttr(url)}">`, `<link rel="canonical" href="${escAttr(url)}">`] : []),
     ...(HAS_OG && PUBLIC_URL ? [`<meta property="og:image" content="${escAttr(PUBLIC_URL)}/og.png">`, `<meta property="og:image:width" content="1200">`, `<meta property="og:image:height" content="630">`, `<meta name="twitter:image" content="${escAttr(PUBLIC_URL)}/og.png">`] : []),
