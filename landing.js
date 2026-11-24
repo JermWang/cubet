@@ -21,6 +21,40 @@ const withTimeout = (p, ms, fallback) => Promise.race([p, wait(ms).then(() => fa
 const terminalUrl = (t, dir, target, duration, stake = cfg.defaultStake) =>
   '/terminal?' + new URLSearchParams({ coin: t.ca, dir, target, duration, stake });
 
+/* ---------- official contract address: one tap copies it ---------- */
+(() => {
+  const btn = $('#caCopy'), addr = $('#caAddr'), label = $('.ca-label', btn), status = $('#caStatus');
+  const ca = String(cfg.token?.ca || '').trim();
+  if (!ca) return;                        // not launched yet: stays "coming soon"
+  if (!isCa(ca)) { console.warn('cubet: token.ca is not a valid Solana address; the copy button stays off.'); return; }
+  const short = `${ca.slice(0, 6)}…${ca.slice(-6)}`;
+  const fit = () => { addr.textContent = innerWidth < 560 ? short : ca; };
+  fit(); addEventListener('resize', fit, { passive: true });
+  btn.disabled = false;
+  btn.title = ca;
+  btn.setAttribute('aria-label', `Copy the official cubet contract address ${ca}`);
+  let timer;
+  btn.addEventListener('click', async () => {
+    const legacyCopy = () => {
+      const ta = Object.assign(document.createElement('textarea'), { value: ca, readOnly: true });
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.append(ta); ta.select();
+      const ok = document.execCommand('copy'); ta.remove(); btn.focus();
+      if (!ok) throw new Error('copy blocked');
+    };
+    try {
+      try { await navigator.clipboard.writeText(ca); } catch { legacyCopy(); }
+      label.textContent = 'Copied'; status.textContent = 'Contract address copied';
+      btn.classList.add('copied');
+    } catch {
+      label.textContent = 'Press Ctrl+C'; status.textContent = 'Copy failed. The address is selected.';
+      addr.textContent = ca; getSelection().selectAllChildren(addr);
+    }
+    clearTimeout(timer);
+    timer = setTimeout(() => { label.textContent = 'Official CA'; status.textContent = ''; btn.classList.remove('copied'); }, 1800);
+  });
+})();
+
 /* ---------- brand + things that need no data ---------- */
 $$('[data-brand]').forEach(el => { el.textContent = cfg.brand.name; });
 $$('[data-footer]').forEach(el => { el.textContent = cfg.brand.footer; });

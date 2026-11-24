@@ -11,6 +11,12 @@ window.CUBET = {
     footer: 'cubet · live Solana market data · demo SOL',
   },
 
+  // The official cubet token. One place for the contract address: the splash page's copy button reads it,
+  // and the TOKEN_CA environment variable overrides it on the server. Blank = the button shows "coming soon".
+  token: {
+    ca: '',
+  },
+
   currency: 'SOL',
   storageKey: 'cubet-v2',       // browser key for the theme preference only
   startingBalance: 1,           // demo SOL every new player starts with (credited by the server)

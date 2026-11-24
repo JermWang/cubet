@@ -37,6 +37,10 @@ export default defineRailway(() => {
       APP_TAGLINE: "Set a market-cap target, find someone who disagrees, and the winner takes the whole stack.",
       APP_FOOTER: "cubet · live Solana market data · demo SOL",
 
+      // Token. The official contract address for the splash page's copy button. Fill it in on the
+      // Railway dashboard at launch; blank shows "coming soon".
+      TOKEN_CA: preserve(),
+
       // Demo economy
       CURRENCY: "SOL",
       STORAGE_KEY: "cubet-v2",

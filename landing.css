@@ -28,6 +28,19 @@
 .splash-note a:hover{color:var(--text)}
 .lp-pill{display:inline-flex;align-items:center;gap:9px;margin:0 0 28px;padding:6px 12px 6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.035);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:13px;font-weight:500;color:var(--text-2);animation:lp-up .8s var(--ease) both}
 .lp-ctas{display:flex;gap:10px;flex-wrap:wrap}
+/* official contract address: one tap copies it */
+.ca-copy{display:inline-flex;align-items:center;gap:10px;max-width:100%;margin:16px 0 0;padding:0 12px 0 6px;height:40px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--text-2);font:inherit;font-size:13px;cursor:pointer;transition:background .2s,border-color .2s,color .2s;animation:lp-up .9s var(--ease) .72s both}
+.ca-copy:hover:not(:disabled){background:rgba(255,255,255,.06);border-color:rgba(170,195,255,.35);color:var(--text)}
+.ca-copy:active:not(:disabled){transform:scale(.98)}
+.ca-copy:focus-visible{outline:2px solid #6E95FF;outline-offset:2px}
+.ca-copy:disabled{cursor:default}
+.ca-label{flex:none;padding:5px 8px;border-radius:7px;background:rgba(255,255,255,.06);font-weight:500;color:var(--text)}
+.ca-addr{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:12.5px}
+.ca-copy:disabled .ca-addr{color:var(--muted)}
+.ca-copy:disabled .ca-ico{display:none}
+.ca-ico{flex:none;opacity:.75}
+.ca-copy.copied{border-color:var(--up);color:var(--text)}
+.ca-copy.copied .ca-label{background:var(--up-soft);color:var(--up)}
 /* once the two buttons stack on a phone, give them one shared width instead of two ragged ones */
 @media (max-width:480px){.lp-ctas .btn{flex:1 1 100%;justify-content:center}}
 @keyframes lp-up{from{opacity:0;transform:translateY(18px);filter:blur(6px)}}

@@ -59,6 +59,7 @@ const brand = Object.fromEntries(Object.entries({
 }).filter(([, v]) => v));
 const publicConfig = Object.fromEntries(Object.entries({
   brand: Object.keys(brand).length ? brand : undefined,
+  token: str('TOKEN_CA') ? { ca: str('TOKEN_CA') } : undefined,
   currency: str('CURRENCY') || undefined,
   storageKey: str('STORAGE_KEY') || undefined,
   startingBalance: num('STARTING_BALANCE', undefined),
