@@ -92,6 +92,23 @@ export function createPayments({ book, rpcUrl, cluster = 'mainnet-beta', treasur
   };
   const requireOn = () => { if (!enabled) fail(503, 'payments_off', configError ? 'Payments are paused while cubet fixes its configuration.' : 'Deposits and withdrawals are not switched on yet.'); };
 
+  // Only transfers made after cubet started watching this treasury are deposits. A wallet reused as the
+  // treasury has older history (its owner's own transfers); none of that may ever be credited or listed.
+  // The start is when cubet first saw this treasury (the first deposit row it recorded, or now).
+  let since = 0;
+  if (enabled) {
+    const key = `deposits_since:${treasury}`;
+    since = Number(q.getMeta.get(key)?.value) || 0;
+    if (!since) {
+      const first = db.prepare('SELECT MIN(seen_at) m FROM deposits').get().m;
+      since = Math.floor((first || Date.now()) / 1000);
+      q.setMeta.run(key, String(since));
+    }
+    const removed = db.prepare("DELETE FROM deposits WHERE status = 'unclaimed' AND block_time IS NOT NULL AND block_time < ?").run(since).changes;
+    if (removed) log.log?.(`payments: removed ${removed} pre-launch treasury transfers (before ${new Date(since * 1000).toISOString()}); they were never cubet deposits`);
+  }
+  if (feeWallet && feeWallet === treasury) feeWallet = '';   // fees already sit in the treasury; nothing to sweep
+
   /* ---------- sign-in with a wallet ---------- */
   const nonces = new Map();                      // nonce → { wallet, message, exp }
   // `host` is the page the visitor is on, so the wallet shows a message for the same domain it's connected from.
@@ -133,6 +150,7 @@ export function createPayments({ book, rpcUrl, cluster = 'mainnet-beta', treasur
     if (!txn) return 'pending';                                                                 // not finalized yet
     q.markScanned.run(signature, Date.now());
     if (txn.meta?.err) return 'none';
+    if (txn.blockTime != null && txn.blockTime < since) return 'none';                       // before cubet used this treasury
     const inflows = [...parseTransfersIn(txn, treasury)].filter(([sender]) => sender !== treasury);
     if (!inflows.length) return 'none';
     // Defense in depth: only credit what the treasury's balance actually gained in this transaction.
@@ -176,8 +194,8 @@ export function createPayments({ book, rpcUrl, cluster = 'mainnet-beta', treasur
         const sigs = await rpc('getSignaturesForAddress', [treasury, { limit: 200, commitment: 'finalized', ...(before ? { before } : {}), ...(cursor ? { until: cursor } : {}) }]);
         if (!sigs.length) break;
         newest ??= sigs[0].signature;
-        for (const s of sigs) if (!s.err && !q.scanned.get(s.signature)) todo.push(s.signature);
-        if (sigs.length < 200) break;
+        for (const s of sigs) if (!s.err && !q.scanned.get(s.signature) && !(s.blockTime != null && s.blockTime < since)) todo.push(s.signature);
+        if (sigs.length < 200 || (sigs.at(-1).blockTime != null && sigs.at(-1).blockTime < since)) break;
         before = sigs.at(-1).signature;
       }
       for (const sig of todo.reverse()) {
