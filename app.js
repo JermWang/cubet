@@ -233,7 +233,7 @@ async function loadBook({ quiet = false } = {}) {
     const before = new Map(state.bets.map(b => [b.id, b]));
     const isNew = snap.bets.some(b => !before.has(b.id)) || snap.bets.length !== before.size || snap.bets.some(b => before.get(b.id)?.state !== b.state);
     if (!quiet && before.size) announce(before, snap.bets);
-    Object.assign(state, { bets: snap.bets, stats: snap.stats, me, balance: me.balance });
+    Object.assign(state, { bets: snap.bets, stats: snap.stats, me, balance: me?.balance ?? 0 }); // me is null until a wallet signs in
     ui.bookError = null;
     if (isNew || ui.loading) renderList(); else { renderBalance(); renderStats(); }
     if (!$('#leaderView').hidden) renderLeader();

@@ -122,8 +122,10 @@ function chart(values, { times = [], target = null, dir = 'above', animate = tru
     `<rect class="ch-hit" x="${L}" y="0" width="${iw}" height="${H}" fill="transparent"/></svg>`;
 }
 
-/* ---------- the brand cube, static (empty states) ---------- */
+/* ---------- the brand mascot, static (empty states) ---------- */
 function cubeMark(cls = '') {
+  // the cubet mascot (Prime), one still drawing from mascot.js; the wireframe below only if mascot.js is missing
+  if (window.Mascot) { const v = Mascot.SIZES.sm.view; return `<svg class="cubemark ${cls}" viewBox="${v.join(' ')}" aria-hidden="true">${Mascot.markup(0, { size: 'sm' })}</svg>`; }
   const id = `cm${++uid}`;
   return `<svg class="cubemark ${cls}" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="${id}" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#C6DAFF"/><stop offset=".5" stop-color="#4D7CFF"/><stop offset="1" stop-color="#7B61FF"/></linearGradient></defs>` +
     `<g fill="none" stroke="url(#${id})" stroke-linejoin="round" stroke-linecap="round"><g stroke-width="2.2"><path d="M32 8 53 20 53 44 32 56 11 44 11 20Z"/><path d="M11 20 32 32 53 20M32 32V56"/></g>` +
