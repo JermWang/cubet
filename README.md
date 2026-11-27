@@ -3,7 +3,7 @@
 A market-cap betting terminal for any Solana token. Players sign in with their Solana wallet and stake real SOL: deposits go to cubet's treasury wallet and are credited once finalized on-chain, withdrawals go back to the player's own wallet. Token data is live and checked on-chain, and the server settles each bet on the real market cap at its expiry.
 
 - **Live:** https://www.cubetsolana.xyz (also https://cubet-production.up.railway.app)
-- **X:** https://x.com/cubetsol_
+- **X:** https://x.com/cubetmarket
 - **`/`**: landing page. Every call to action leads to the terminal.
 - **`/terminal`**: the betting terminal: open bets, My Bets, settled bets, create a bet, leaderboard, wallet (connect, deposit, withdraw).
 - **`/proof`**: live checks against the real integrations, every settlement with the price candle it used, and the limits below.

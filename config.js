@@ -15,7 +15,7 @@ window.CUBET = {
   // The official cubet token. One place for the contract address: the splash page's copy button reads it,
   // and the TOKEN_CA environment variable overrides it on the server. Blank = the button shows "coming soon".
   token: {
-    ca: '',
+    ca: '3NSUeHQXrcwqibJ78MDQ2YcXqL7pyP35b61MraQXpump',
   },
 
   currency: 'SOL',
