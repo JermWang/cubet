@@ -25,9 +25,13 @@ try { process.loadEnvFile(path.join(root, '.env')); } catch { /* no .env file: u
 
 /* ---------- settings from the environment ---------- */
 const env = process.env;
-const str = (k, d = '') => (env[k] ?? '').trim() || d;
-const num = (k, d) => { const n = Number(env[k]); return env[k] !== undefined && env[k] !== '' && Number.isFinite(n) ? n : d; };
-const bool = (k, d) => env[k] === undefined || env[k] === '' ? d : /^(1|true|yes|on)$/i.test(env[k]);
+// Railway's dashboard hides variables with empty values, so settings waiting to be filled in are created
+// as REPLACE_ME. That placeholder counts exactly as blank (unset) everywhere.
+const PLACEHOLDER = 'REPLACE_ME';
+const raw = k => { const v = String(env[k] ?? '').trim(); return v === PLACEHOLDER ? '' : v; };
+const str = (k, d = '') => raw(k) || d;
+const num = (k, d) => { const v = raw(k), n = Number(v); return v !== '' && Number.isFinite(n) ? n : d; };
+const bool = (k, d) => { const v = raw(k); return v === '' ? d : /^(1|true|yes|on)$/i.test(v); };
 
 const PROD = str('NODE_ENV') === 'production';
 const PORT = num('PORT', 4174);
@@ -320,7 +324,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   const where = HOST === '0.0.0.0' ? `0.0.0.0:${PORT}` : `http://localhost:${server.address().port}`;
   console.log(`cubet listening on ${where}${PUBLIC_URL ? ` · public URL ${PUBLIC_URL}` : ''}${PROD ? ' · production' : ''}`);
-  if (!env.SOLANA_RPC_URL) console.log('Using the public Solana RPC. Set SOLANA_RPC_URL (Helius, QuickNode, Triton…) for production reliability.');
+  if (!str('SOLANA_RPC_URL')) console.log('Using the public Solana RPC. Set SOLANA_RPC_URL (Helius, QuickNode, Triton…) for production reliability.');
 });
 server.on('error', err => { console.error(err.message); process.exitCode = 1; });
 
