@@ -59,11 +59,10 @@ const terminalUrl = (t, dir, target, duration, stake = cfg.defaultStake) =>
 $$('[data-brand]').forEach(el => { el.textContent = cfg.brand.name; });
 $$('[data-footer]').forEach(el => { el.textContent = cfg.brand.footer; });
 document.title = cfg.brand.title;
-// The splash is the cubet mascot, big (mascot.js). The smaller brand cubes stay wireframes.
+// The cubet mascot (mascot.js): big in the splash and the final CTA, small in the mega-menu cards.
 Mascot.mount($('#splashCube'));
-const BRAND_CUBE = { inner: false, dots: false, faces: true, tumble: true };
-FX.cube($('#finalCube'), { ...BRAND_CUBE, stroke: 2, speed: 0.5 });
-$$('.mm-cube').forEach(n => FX.cube(n, { ...BRAND_CUBE, stroke: 1.5, speed: 0.6, follow: false }));
+Mascot.mount($('#finalCube'));
+$$('.mm-cube').forEach(n => Mascot.mount(n, { size: 'sm' }));
 $('#lpClock').innerHTML = art.clock();
 $('#lpDurations').innerHTML = cfg.durations.map(d => `<span class="chip">${esc(d.label)}</span>`).join('');
 $('#lpCall').innerHTML = `<div class="up">${art.trend('above')}<b>Higher</b><span>above your target</span></div><div class="down">${art.trend('below')}<b>Lower</b><span>below your target</span></div>`;
