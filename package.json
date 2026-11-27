@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs",
-    "check": "node --check config.js && node --check data.js && node --check fx.js && node --check art.js && node --check app.js && node --check landing.js && node --check proof.js && node --check market.mjs && node --check book.mjs && node --check sol.mjs && node --check payments.mjs && node --check wallet.js && node --check server.mjs",
+    "check": "node --check config.js && node --check data.js && node --check fx.js && node --check mascot.js && node --check art.js && node --check app.js && node --check landing.js && node --check proof.js && node --check market.mjs && node --check book.mjs && node --check sol.mjs && node --check payments.mjs && node --check wallet.js && node --check server.mjs",
     "deploy": "railway up --service cubet"
   },
   "engines": {
